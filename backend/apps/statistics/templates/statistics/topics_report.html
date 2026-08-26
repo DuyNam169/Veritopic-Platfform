@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 12px; }
+  h1 { font-size: 18px; text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+  th { background-color: #eee; }
+</style>
+</head>
+<body>
+  <h1>Danh sách đề tài đồ án</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Tên đề tài</th><th>Bộ môn</th><th>Khóa</th><th>Năm học</th><th>GVHD</th><th>Trạng thái</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in topics %}
+      <tr>
+        <td>{{ t.id }}</td>
+        <td>{{ t.title }}</td>
+        <td>{{ t.department.name }}</td>
+        <td>{{ t.cohort.name }}</td>
+        <td>{{ t.academic_year.name }}</td>
+        <td>{{ t.proposed_by.get_full_name }}</td>
+        <td>{{ t.get_status_display }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

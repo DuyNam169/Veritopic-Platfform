@@ -1,0 +1,191 @@
+﻿Folder PATH listing for volume Dowload
+Volume serial number is 0000006C 8C7E:558E
+D:.
+|   .gitignore
+|   docker-compose.prod.yml
+|   docker-compose.yml
+|   README.md
+|   structure.txt
+|   
++---backend
+|   |   .env
+|   |   .env.example
+|   |   Dockerfile
+|   |   entrypoint.sh
+|   |   manage.py
+|   |   pytest.ini
+|   |   
+|   +---apps
+|   |   |   __init__.py
+|   |   |   
+|   |   +---academics
+|   |   |   |   admin.py
+|   |   |   |   apps.py
+|   |   |   |   models.py
+|   |   |   |   serializers.py
+|   |   |   |   urls.py
+|   |   |   |   views.py
+|   |   |   |   __init__.py
+|   |   |   |   
+|   |   |   \---migrations
+|   |   |           0001_initial.py
+|   |   |           0002_initial.py
+|   |   |           __init__.py
+|   |   |           
+|   |   +---accounts
+|   |   |   |   admin.py
+|   |   |   |   apps.py
+|   |   |   |   management_urls.py
+|   |   |   |   management_views.py
+|   |   |   |   models.py
+|   |   |   |   serializers.py
+|   |   |   |   urls.py
+|   |   |   |   views.py
+|   |   |   |   __init__.py
+|   |   |   |   
+|   |   |   \---migrations
+|   |   |           0001_initial.py
+|   |   |           __init__.py
+|   |   |           
+|   |   +---common
+|   |   |       exceptions.py
+|   |   |       management_urls.py
+|   |   |       mixins.py
+|   |   |       pagination.py
+|   |   |       permissions.py
+|   |   |       __init__.py
+|   |   |       
+|   |   +---statistics
+|   |   |   |   apps.py
+|   |   |   |   urls.py
+|   |   |   |   views.py
+|   |   |   |   __init__.py
+|   |   |   |   
+|   |   |   +---exporters
+|   |   |   |       excel_exporter.py
+|   |   |   |       pdf_exporter.py
+|   |   |   |       __init__.py
+|   |   |   |       
+|   |   |   \---templates
+|   |   |       \---statistics
+|   |   |               topics_report.html
+|   |   |               
+|   |   \---topics
+|   |       |   admin.py
+|   |       |   apps.py
+|   |       |   management_urls.py
+|   |       |   management_views.py
+|   |       |   models.py
+|   |       |   serializers.py
+|   |       |   urls.py
+|   |       |   views.py
+|   |       |   __init__.py
+|   |       |   
+|   |       +---migrations
+|   |       |       0001_initial.py
+|   |       |       0002_performance_indexes.py
+|   |       |       __init__.py
+|   |       |       
+|   |       \---services
+|   |               similarity.py
+|   |               workflow.py
+|   |               __init__.py
+|   |               
+|   +---config
+|   |   |   asgi.py
+|   |   |   urls.py
+|   |   |   wsgi.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---settings
+|   |           base.py
+|   |           dev.py
+|   |           prod.py
+|   |           __init__.py
+|   |           
+|   +---docker
+|   |       init-pgvector.sql
+|   |       
+|   \---requirements
+|           base.txt
+|           dev.txt
+|           prod.txt
+|           
+\---frontend
+    |   .env
+    |   .env.example
+    |   .eslintrc.cjs
+    |   Dockerfile
+    |   index.html
+    |   nginx.conf
+    |   package.json
+    |   postcss.config.js
+    |   tailwind.config.js
+    |   tsconfig.json
+    |   vite.config.ts
+    |   
+    +---public
+    \---src
+        |   index.css
+        |   main.tsx
+        |   vite-env.d.ts
+        |   
+        +---app
+        |       App.tsx
+        |       providers.tsx
+        |       router.tsx
+        |       
+        +---features
+        |   +---academics
+        |   |   |   api.ts
+        |   |   |   
+        |   |   \---pages
+        |   |           AcademicsPage.tsx
+        |   |           
+        |   +---approval
+        |   |   |   api.ts
+        |   |   |   hooks.ts
+        |   |   |   
+        |   |   \---pages
+        |   |           ApprovalPage.tsx
+        |   |           
+        |   +---auth
+        |   |       api.ts
+        |   |       hooks.ts
+        |   |       LoginPage.tsx
+        |   |       store.ts
+        |   |       
+        |   +---statistics
+        |   |   |   api.ts
+        |   |   |   hooks.ts
+        |   |   |   
+        |   |   \---pages
+        |   |           StatisticsPage.tsx
+        |   |           
+        |   \---topics
+        |       |   api.ts
+        |       |   hooks.ts
+        |       |   types.ts
+        |       |   
+        |       +---components
+        |       |       SimilarityWarning.tsx
+        |       |       TopicTable.tsx
+        |       |       
+        |       \---pages
+        |               TopicDetailPage.tsx
+        |               TopicListPage.tsx
+        |               
+        +---shared
+        |   +---components
+        |   |       AppLayout.tsx
+        |   |       PrivateRoute.tsx
+        |   |       RoleGuard.tsx
+        |   |       
+        |   +---lib
+        |   |       axios.ts
+        |   |       queryClient.ts
+        |   |       
+        |   \---utils
+        \---types
+                index.ts
+                

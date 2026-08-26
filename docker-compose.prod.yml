@@ -1,0 +1,39 @@
+# Docker Compose cho môi trường PRODUCTION: build tối ưu, dùng Gunicorn + Nginx.
+# Chạy: docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/docker/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql:ro
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        REQUIREMENTS_FILE: requirements/prod.txt
+    restart: unless-stopped
+    command: ["gunicorn"]
+    env_file:
+      - ./backend/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
