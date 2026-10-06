@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 
 
 class Cohort(models.Model):
@@ -21,6 +21,13 @@ class AcademicYear(models.Model):
 
     class Meta:
         ordering = ["-name"]
+        constraints = [models.UniqueConstraint(fields=["is_current"], condition=models.Q(is_current=True), name="one_current_academic_year")]
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self.is_current:
+                AcademicYear.objects.filter(is_current=True).exclude(pk=self.pk).update(is_current=False)
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -28,7 +35,7 @@ class AcademicYear(models.Model):
 
 class Semester(models.Model):
     """Học kỳ trong một năm học, ví dụ: Học kỳ 1 - 2025-2026."""
-    academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name="semesters")
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="semesters")
     name = models.CharField(max_length=50)
     start_date = models.DateField()
     end_date = models.DateField()

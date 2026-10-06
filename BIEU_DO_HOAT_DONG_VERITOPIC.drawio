@@ -1,0 +1,81 @@
+<mxfile host="app.diagrams.net" modified="2026-09-16T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="veritopic-class-uml" name="Biểu đồ lớp UML">
+    <mxGraphModel dx="1169" dy="827" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="BIỂU ĐỒ LỚP HỆ THỐNG VERITOPIC" style="text;html=1;align=center;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="300" y="18" width="570" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="accountLabel" value="&amp;laquo;accounts&amp;raquo;" style="text;html=1;align=left;fontSize=10;fontStyle=2;fontColor=#000000;" vertex="1" parent="1"><mxGeometry x="40" y="62" width="150" height="20" as="geometry"/></mxCell>
+        <mxCell id="academicLabel" value="&amp;laquo;academics&amp;raquo;" style="text;html=1;align=left;fontSize=10;fontStyle=2;fontColor=#000000;" vertex="1" parent="1"><mxGeometry x="330" y="62" width="150" height="20" as="geometry"/></mxCell>
+        <mxCell id="topicLabel" value="&amp;laquo;topics&amp;raquo;" style="text;html=1;align=left;fontSize=10;fontStyle=2;fontColor=#000000;" vertex="1" parent="1"><mxGeometry x="510" y="238" width="150" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="abstractUser" value="&lt;b&gt;&lt;i&gt;AbstractUser&lt;/i&gt;&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;# username: String&lt;br&gt;# email: String&lt;br&gt;# first_name: String&lt;br&gt;# last_name: String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="220" height="105" as="geometry"/>
+        </mxCell>
+        <mxCell id="user" value="&lt;b&gt;User&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- role: Role&lt;br&gt;- phone_number: String&lt;br&gt;- student_code: String&lt;br&gt;- department: Department [0..1]&lt;br&gt;- created_at: DateTime&lt;br&gt;- updated_at: DateTime&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="245" width="250" height="230" as="geometry"/>
+        </mxCell>
+        <mxCell id="role" value="&lt;b&gt;&amp;laquo;enumeration&amp;raquo;&lt;/b&gt;&lt;br&gt;&lt;b&gt;Role&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;ADMIN&lt;br&gt;DEPARTMENT_HEAD&lt;br&gt;TEACHER&lt;br&gt;STUDENT&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="70" y="535" width="190" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="department" value="&lt;b&gt;Department&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- name: String {unique}&lt;br&gt;- code: String {unique}&lt;br&gt;- head: User [0..1]&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="330" y="90" width="190" height="135" as="geometry"/>
+        </mxCell>
+        <mxCell id="cohort" value="&lt;b&gt;Cohort&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- name: String {unique}&lt;br&gt;- start_year: Integer&lt;br&gt;- end_year: Integer&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="540" y="90" width="170" height="135" as="geometry"/>
+        </mxCell>
+        <mxCell id="academicYear" value="&lt;b&gt;AcademicYear&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- name: String {unique}&lt;br&gt;- is_current: Boolean&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ save(): void&lt;br&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="730" y="90" width="190" height="135" as="geometry"/>
+        </mxCell>
+        <mxCell id="semester" value="&lt;b&gt;Semester&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- name: String&lt;br&gt;- start_date: Date&lt;br&gt;- end_date: Date&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="940" y="90" width="190" height="135" as="geometry"/>
+        </mxCell>
+        <mxCell id="field" value="&lt;b&gt;Field&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- name: String {unique}&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="330" y="280" width="150" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="topic" value="&lt;b&gt;Topic&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- title: String&lt;br&gt;- description: Text&lt;br&gt;- status: Status&lt;br&gt;- review_note: Text&lt;br&gt;- embedding: Vector[768] [0..1]&lt;br&gt;- department: Department [1]&lt;br&gt;- field: Field [0..1]&lt;br&gt;- cohort: Cohort [1]&lt;br&gt;- academic_year: AcademicYear [1]&lt;br&gt;- semester: Semester [1]&lt;br&gt;- proposed_by: User [1]&lt;br&gt;- reviewed_by: User [0..1]&lt;br&gt;- created_at: DateTime&lt;br&gt;- updated_at: DateTime&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="510" y="270" width="280" height="390" as="geometry"/>
+        </mxCell>
+        <mxCell id="status" value="&lt;b&gt;&amp;laquo;enumeration&amp;raquo;&lt;/b&gt;&lt;br&gt;&lt;b&gt;Status&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;PENDING&lt;br&gt;APPROVED&lt;br&gt;REJECTED&lt;br&gt;RENAME_REQUESTED&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="320" y="430" width="170" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="action" value="&lt;b&gt;&amp;laquo;enumeration&amp;raquo;&lt;/b&gt;&lt;br&gt;&lt;b&gt;Action&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;CREATED&lt;br&gt;UPDATED&lt;br&gt;APPROVED&lt;br&gt;REJECTED&lt;br&gt;RENAME_REQUESTED&lt;br&gt;ASSIGNED&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="320" y="590" width="170" height="155" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="assignment" value="&lt;b&gt;TopicAssignment&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- topic: Topic [1]&lt;br&gt;- students: User [1..*]&lt;br&gt;- assigned_by: User [1]&lt;br&gt;- assigned_at: DateTime&lt;br&gt;- note: Text&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="850" y="270" width="265" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="history" value="&lt;b&gt;TopicHistory&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- topic: Topic [1]&lt;br&gt;- action: Action&lt;br&gt;- actor: User [0..1]&lt;br&gt;- note: Text&lt;br&gt;- created_at: DateTime&lt;/div&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;+ __str__(): String&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="850" y="465" width="265" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="similarity" value="&lt;b&gt;TopicSimilarityResult&lt;/b&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;- id: BigInt {PK}&lt;br&gt;- topic: Topic [1]&lt;br&gt;- similar_topic: Topic [1]&lt;br&gt;- similarity_percent: Float&lt;br&gt;- warning_level: String&lt;br&gt;- created_at: DateTime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1;fontColor=#000000;fontSize=9;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="850" y="660" width="265" height="135" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="eInheritance" value="" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=block;endFill=0;" edge="1" parent="1" source="user" target="abstractUser"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eRole" value="&amp;laquo;use&amp;raquo;" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;dashed=1;endArrow=open;endFill=0;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="user" target="role"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eDepartmentUser" value="members 0..*        0..1 department" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="department" target="user"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eYearSemester" value="1                     0..*" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="academicYear" target="semester"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="eDepartmentTopic" value="1 department        0..* topics" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="department" target="topic"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eCohortTopic" value="1 cohort        0..* topics" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="cohort" target="topic"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eYearTopic" value="1 academic_year        0..* topics" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="academicYear" target="topic"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eSemesterTopic" value="1 semester        0..* topics" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="semester" target="topic"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eFieldTopic" value="0..1 field        0..* topics" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="field" target="topic"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eUserTopic" value="1 proposer        0..* proposed topics" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="user" target="topic"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eStatus" value="&amp;laquo;use&amp;raquo;" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;dashed=1;endArrow=open;endFill=0;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="topic" target="status"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="eAssignment" value="1                 0..*" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;startArrow=diamond;startFill=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="topic" target="assignment"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eHistory" value="1                 0..*" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;startArrow=diamond;startFill=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="topic" target="history"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eSimilarity" value="1                 0..*" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;startArrow=diamond;startFill=1;endArrow=none;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="topic" target="similarity"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eAction" value="&amp;laquo;use&amp;raquo;" style="edgeStyle=none;html=1;strokeColor=#000000;strokeWidth=1;dashed=1;endArrow=open;endFill=0;fontSize=8;fontColor=#000000;" edge="1" parent="1" source="history" target="action"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -55,3 +55,12 @@ class ReadOnlyOrAdmin(BasePermission):
         if request.method in self.SAFE_METHODS:
             return True
         return request.user.role == "admin"
+
+
+class IsTopicOwnerOrAdmin(BasePermission):
+    """Teachers may change only their own topics; admins retain full access."""
+
+    message = "Bạn chỉ có thể chỉnh sửa đề tài do chính mình đề xuất."
+
+    def has_object_permission(self, request, view, obj):
+        return request.user.role == "admin" or obj.proposed_by_id == request.user.id

@@ -6,10 +6,12 @@ import RoleGuard from "@/shared/components/RoleGuard";
 
 import LoginPage from "@/features/auth/LoginPage";
 import AcademicsPage from "@/features/academics/pages/AcademicsPage";
+import UserManagementPage from "@/features/accounts/pages/UserManagementPage";
 import ApprovalPage from "@/features/approval/pages/ApprovalPage";
 import StatisticsPage from "@/features/statistics/pages/StatisticsPage";
 import TopicDetailPage from "@/features/topics/pages/TopicDetailPage";
 import TopicListPage from "@/features/topics/pages/TopicListPage";
+import ProfilePage from "@/features/auth/pages/ProfilePage";
 
 /**
  * Route quản lý riêng (Duyệt đề tài, Danh mục hệ thống) được tách nhóm bằng RoleGuard,
@@ -27,14 +29,21 @@ export const router = createBrowserRouter([
           { path: "/", element: <TopicListPage /> },
           { path: "/topics", element: <TopicListPage /> },
           { path: "/topics/:id", element: <TopicDetailPage /> },
-          { path: "/statistics", element: <StatisticsPage /> },
+          { path: "/profile", element: <ProfilePage /> },
           {
             element: <RoleGuard allow={["admin", "department_head"]} />,
             children: [{ path: "/approval", element: <ApprovalPage /> }],
           },
           {
             element: <RoleGuard allow={["admin"]} />,
-            children: [{ path: "/academics", element: <AcademicsPage /> }],
+            children: [
+              { path: "/academics", element: <AcademicsPage /> },
+              { path: "/statistics", element: <StatisticsPage /> },
+            ],
+          },
+          {
+            element: <RoleGuard allow={["admin"]} />,
+            children: [{ path: "/users", element: <UserManagementPage /> }],
           },
         ],
       },

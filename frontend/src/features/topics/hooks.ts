@@ -26,6 +26,22 @@ export function useSimilarityCheck(id: number) {
   });
 }
 
+export function useTopicHistory(id: number) {
+  return useQuery({
+    queryKey: ["topics", id, "history"],
+    queryFn: () => topicsApi.history(id),
+    enabled: !!id,
+  });
+}
+
+export function useStoredSimilarityResults(id: number) {
+  return useQuery({
+    queryKey: ["topics", id, "stored-similarity"],
+    queryFn: () => topicsApi.storedSimilarityResults(id),
+    enabled: !!id,
+  });
+}
+
 export function useCreateTopic() {
   const queryClient = useQueryClient();
   return useMutation({

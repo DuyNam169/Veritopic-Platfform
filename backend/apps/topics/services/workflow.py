@@ -3,7 +3,39 @@ from django.db import transaction
 
 from apps.topics.models import Topic, TopicHistory, TopicSimilarityResult
 
-from .similarity import find_similar_topics, get_embedding, is_exact_duplicate
+from .similarity import find_similar_topics, get_embedding, is_exact_duplicate, normalize_text
+
+
+@transaction.atomic
+def refresh_similarity_results(topic: Topic):
+    """Recompute the topic vector and replace its persisted similarity snapshot."""
+    topic.embedding = get_embedding(f"{topic.title}\n{topic.description}")
+    topic.save(update_fields=["embedding"])
+
+    results = find_similar_topics(topic)
+    existing_titles = list(Topic.objects.exclude(pk=topic.pk).values_list("title", flat=True))
+    exact_duplicate = is_exact_duplicate(topic.title, existing_titles)
+    normalized_title = normalize_text(topic.title)
+    final_results = []
+    for result in results:
+        exact_match = exact_duplicate and normalize_text(result["topic"].title) == normalized_title
+        final_results.append({
+            "topic": result["topic"],
+            "similarity_percent": 100.0 if exact_match else result["similarity_percent"],
+            "warning_level": "duplicate" if exact_match else result["warning_level"],
+        })
+
+    TopicSimilarityResult.objects.filter(topic=topic).delete()
+    TopicSimilarityResult.objects.bulk_create([
+        TopicSimilarityResult(
+            topic=topic,
+            similar_topic=result["topic"],
+            similarity_percent=result["similarity_percent"],
+            warning_level=result["warning_level"],
+        )
+        for result in final_results
+    ])
+    return {"exact_duplicate": exact_duplicate, "similar_results": final_results}
 
 
 @transaction.atomic
@@ -16,42 +48,9 @@ def propose_topic(topic: Topic, actor):
     (Bước lọc TF-IDF trong similarity.py là hàm tối ưu tùy chọn, không bắt buộc trong pipeline
     vì pgvector đã tự làm truy vấn lân cận gần nhất hiệu quả — xem ghi chú trong similarity.py)
     """
-    existing_titles = list(
-        Topic.objects.exclude(pk=topic.pk).values_list("title", flat=True)
-    )
-    exact_duplicate = is_exact_duplicate(topic.title, existing_titles)
-
-    topic.embedding = get_embedding(f"{topic.title}\n{topic.description}")
-    topic.save(update_fields=["embedding"])
-
-    similar_results = find_similar_topics(topic)
-
-    # Tính giá trị cuối cùng (có ép 100%/duplicate cho trường hợp trùng tên chính xác) MỘT LẦN DUY NHẤT,
-    # rồi dùng chung cho cả việc lưu DB lẫn trả về API — tránh lệch dữ liệu giữa hai nơi.
-    normalized_title = topic.title.strip().lower()
-    final_results = []
-    for r in similar_results:
-        is_this_the_exact_match = exact_duplicate and r["topic"].title.strip().lower() == normalized_title
-        final_results.append(
-            {
-                "topic": r["topic"],
-                "similarity_percent": 100.0 if is_this_the_exact_match else r["similarity_percent"],
-                "warning_level": "duplicate" if is_this_the_exact_match else r["warning_level"],
-            }
-        )
-
-    TopicSimilarityResult.objects.filter(topic=topic).delete()
-    TopicSimilarityResult.objects.bulk_create(
-        [
-            TopicSimilarityResult(
-                topic=topic,
-                similar_topic=r["topic"],
-                similarity_percent=r["similarity_percent"],
-                warning_level=r["warning_level"],
-            )
-            for r in final_results
-        ]
-    )
+    refresh_result = refresh_similarity_results(topic)
+    exact_duplicate = refresh_result["exact_duplicate"]
+    final_results = refresh_result["similar_results"]
 
     history_note = "Phát hiện trùng tên chính xác với đề tài đã có." if exact_duplicate else ""
     TopicHistory.objects.create(
@@ -96,5 +95,12 @@ def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = ""):
 
     assignment = TopicAssignment.objects.create(topic=topic, assigned_by=actor, note=note)
     assignment.students.set(student_ids)
-    TopicHistory.objects.create(topic=topic, action=TopicHistory.Action.ASSIGNED, actor=actor, note=note)
+    summary = f"Giao cho {len(student_ids)} sinh viên."
+    history_note = f"{summary} {note}".strip() if note else summary
+    TopicHistory.objects.create(
+        topic=topic,
+        action=TopicHistory.Action.ASSIGNED,
+        actor=actor,
+        note=history_note,
+    )
     return assignment
