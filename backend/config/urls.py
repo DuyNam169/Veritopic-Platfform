@@ -4,6 +4,8 @@ Route quản trị (chỉ Quản trị viên / Trưởng bộ môn) được tá
 để phân biệt rõ với route nghiệp vụ thông thường, dễ áp policy/permission/logging riêng.
 """
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
@@ -25,3 +27,6 @@ urlpatterns = [
     # ---- Route quản lý riêng (Admin / Trưởng bộ môn) ----
     path("api/v1/management/", include("apps.common.management_urls")),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

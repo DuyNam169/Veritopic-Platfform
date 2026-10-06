@@ -1,3 +1,5 @@
+import type { User } from "@/types";
+
 export type TopicStatus = "pending" | "approved" | "rejected" | "rename_requested";
 export type WarningLevel = "normal" | "review" | "high" | "duplicate";
 
@@ -11,9 +13,18 @@ export interface Topic {
   academic_year: number;
   semester: number;
   proposed_by: number;
+  proposed_by_detail?: User;
+  department_name: string;
+  field_name: string | null;
+  cohort_name: string;
+  academic_year_name: string;
+  semester_name: string;
+  assignment_count: number;
   status: TopicStatus;
+  reviewed_by: number | null;
   review_note: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface SimilarTopicResult {
@@ -21,3 +32,26 @@ export interface SimilarTopicResult {
   similarity_percent: number;
   warning_level: WarningLevel;
 }
+
+export interface StoredSimilarityResult {
+  id: number;
+  similar_topic: number;
+  similar_topic_title: string;
+  similarity_percent: number;
+  warning_level: WarningLevel;
+  created_at: string;
+}
+
+export interface TopicHistoryEntry {
+  id: number;
+  action: string;
+  actor: number | null;
+  actor_name: string;
+  note: string;
+  created_at: string;
+}
+
+export type TopicUpdatePayload = Pick<
+  Topic,
+  "title" | "description" | "department" | "field" | "cohort" | "academic_year" | "semester"
+>;

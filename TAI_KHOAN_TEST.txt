@@ -1,0 +1,21 @@
+TÀI KHOẢN KIỂM THỬ VERITOPIC
+==============================
+
+Mật khẩu dùng chung: Veritopic@2026
+
+1. Quản trị viên
+   Username: admin_test
+
+2. Trưởng bộ môn
+   Username: tbm_test
+
+3. Giảng viên
+   Username: gv_test
+
+4. Sinh viên
+   Username: sv_test
+
+Truy cập ứng dụng: http://localhost:5173
+API Backend: http://localhost:8000
+
+Lưu ý: Đây là các tài khoản mẫu dành riêng cho môi trường phát triển/kiểm thử.

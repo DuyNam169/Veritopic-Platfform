@@ -95,9 +95,10 @@ class TopicHistory(models.Model):
         REJECTED = "rejected", "Từ chối"
         RENAME_REQUESTED = "rename_requested", "Yêu cầu sửa tên"
         ASSIGNED = "assigned", "Giao đề tài"
+        SIMILARITY_REFRESHED = "similarity_refreshed", "Chạy lại kiểm tra tương đồng"
 
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="history")
-    action = models.CharField(max_length=20, choices=Action.choices)
+    action = models.CharField(max_length=30, choices=Action.choices)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -131,3 +132,27 @@ class TopicSimilarityResult(models.Model):
 
     class Meta:
         ordering = ["-similarity_percent"]
+
+
+class TopicDeletionAudit(models.Model):
+    """Dấu vết độc lập, được giữ lại sau khi đề tài và dữ liệu trực thuộc bị xóa."""
+
+    original_topic_id = models.PositiveBigIntegerField(db_index=True)
+    title = models.CharField(max_length=500)
+    status = models.CharField(max_length=20, choices=Topic.Status.choices)
+    proposed_by_label = models.CharField(max_length=255, blank=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="topic_deletion_audits",
+    )
+    had_assignments = models.BooleanField(default=False)
+    snapshot = models.JSONField(default=dict)
+    deleted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-deleted_at"]
+
+    def __str__(self):
+        return f"Đã xóa #{self.original_topic_id} - {self.title}"

@@ -3,19 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  body { font-family: "DejaVu Sans", sans-serif; font-size: 12px; }
-  h1 { font-size: 18px; text-align: center; }
-  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-  th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
-  th { background-color: #eee; }
+  @page { size: A4 landscape; margin: 14mm; @bottom-right { content: "Trang " counter(page) "/" counter(pages); font-size: 9px; color: #64748b; } }
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 9px; color: #0f172a; }
+  h1 { margin: 0 0 6px; font-size: 18px; text-align: center; color: #1e3a8a; }
+  .meta { margin: 2px 0; color: #475569; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; table-layout: fixed; }
+  th, td { border: 1px solid #94a3b8; padding: 5px 6px; text-align: left; overflow-wrap: anywhere; }
+  th { background-color: #2563eb; color: white; text-align: center; }
+  tbody tr:nth-child(even) { background-color: #f8fafc; }
+  .empty { padding: 18px; text-align: center; color: #64748b; font-style: italic; }
+  .id { width: 4%; } .title { width: 25%; } .compact { width: 10%; } .teacher { width: 15%; } .status { width: 11%; }
 </style>
 </head>
 <body>
-  <h1>Danh sách đề tài đồ án</h1>
+  <h1>BÁO CÁO DANH SÁCH ĐỀ TÀI</h1>
+  <p class="meta"><strong>Thời điểm xuất:</strong> {{ generated_at }}</p>
+  <p class="meta"><strong>Phạm vi dữ liệu:</strong> {{ filter_summary }}</p>
   <table>
     <thead>
       <tr>
-        <th>ID</th><th>Tên đề tài</th><th>Bộ môn</th><th>Khóa</th><th>Năm học</th><th>GVHD</th><th>Trạng thái</th>
+        <th class="id">ID</th><th class="title">Tên đề tài</th><th class="compact">Bộ môn</th><th class="compact">Lĩnh vực</th><th class="compact">Khóa</th><th class="compact">Năm học</th><th class="compact">Học kỳ</th><th class="teacher">GVHD</th><th class="status">Trạng thái</th>
       </tr>
     </thead>
     <tbody>
@@ -24,11 +31,15 @@
         <td>{{ t.id }}</td>
         <td>{{ t.title }}</td>
         <td>{{ t.department.name }}</td>
+        <td>{{ t.field.name|default:"Chưa phân loại" }}</td>
         <td>{{ t.cohort.name }}</td>
         <td>{{ t.academic_year.name }}</td>
-        <td>{{ t.proposed_by.get_full_name }}</td>
+        <td>{{ t.semester.name }}</td>
+        <td>{{ t.proposed_by.get_full_name|default:t.proposed_by.username }}</td>
         <td>{{ t.get_status_display }}</td>
       </tr>
+      {% empty %}
+      <tr><td class="empty" colspan="9">Không có đề tài phù hợp với điều kiện lọc.</td></tr>
       {% endfor %}
     </tbody>
   </table>
