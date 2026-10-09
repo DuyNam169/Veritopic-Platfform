@@ -177,6 +177,7 @@ class ProfileManagementTests(APITestCase):
         response = self.client.post(url, {"password": "HackerPassword@123"})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+
     def test_admin_can_attach_cohort_only_to_student_account(self):
         cohort = Cohort.objects.create(name="K66", start_year=2026, end_year=2030)
         self.client.force_authenticate(user=self.admin)
@@ -301,3 +302,75 @@ class ProfileManagementTests(APITestCase):
         self.assertEqual(department_response.data["count"], 1)
         self.assertEqual(department_response.data["results"][0]["id"], self.teacher.pk)
         self.assertEqual(search_response.data["count"], 1)
+        self.assertEqual(search_response.data["results"][0]["id"], self.teacher.pk)
+
+
+class PeopleDirectoryTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="directory_admin", role=User.Role.ADMIN)
+        self.head = User.objects.create_user(username="directory_head", role=User.Role.DEPARTMENT_HEAD)
+        self.teacher = User.objects.create_user(
+            username="directory_teacher",
+            first_name="Nguyễn",
+            last_name="An",
+            role=User.Role.TEACHER,
+        )
+        self.student = User.objects.create_user(
+            username="directory_student",
+            role=User.Role.STUDENT,
+            student_code="SV001",
+        )
+        self.url = reverse("management-people-list")
+
+    def test_admin_and_department_head_can_read_teacher_and_student_profiles(self):
+        for manager in (self.admin, self.head):
+            self.client.force_authenticate(user=manager)
+            response = self.client.get(self.url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            people = response.data["results"]
+            self.assertEqual({person["role"] for person in people}, {"teacher", "student"})
+            student = next(person for person in people if person["id"] == self.student.pk)
+            self.assertEqual(student["student_code"], "SV001")
+
+    def test_directory_supports_filtering_by_role(self):
+        self.client.force_authenticate(user=self.head)
+
+        response = self.client.get(self.url, {"role": "teacher"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([person["id"] for person in response.data["results"]], [self.teacher.pk])
+
+    def test_manager_can_create_profile_without_login_credentials_and_edit_it(self):
+        self.client.force_authenticate(user=self.head)
+
+        created = self.client.post(self.url, {
+            "username": "new_student",
+            "first_name": "Sinh",
+            "last_name": "Viên",
+            "role": "student",
+            "student_code": "SV002",
+        })
+
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        profile = User.objects.get(pk=created.data["id"])
+        self.assertFalse(profile.has_usable_password())
+
+        updated = self.client.patch(
+            f"{self.url}{profile.pk}/",
+            {"first_name": "Sinh viên mới"},
+        )
+        self.assertEqual(updated.status_code, status.HTTP_200_OK, updated.data)
+        self.assertEqual(updated.data["first_name"], "Sinh viên mới")
+
+    def test_directory_rejects_role_changes_and_student_write_access(self):
+        self.client.force_authenticate(user=self.head)
+        role_change = self.client.patch(f"{self.url}{self.student.pk}/", {"role": "teacher"})
+        self.assertEqual(role_change.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("role", role_change.data)
+
+        self.client.force_authenticate(user=self.student)
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_profile_directory_does_not_delete_accounts(self):
+        self.client.force_authenticate(user=self.head)
+        self.assertEqual(self.client.delete(f"{self.url}{self.student.pk}/").status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 from pgvector.django import VectorField
 
-# Kích thước vector của model embedding Groq (nomic-embed-text-v1_5) = 768 chiều.
+# Kích thước embedding của PhoBERT Siamese = 768 chiều.
 # Nếu đổi model embedding khác, PHẢI đổi số này cho khớp rồi chạy lại migration.
 EMBEDDING_DIM = 768
 
@@ -47,7 +47,7 @@ class Topic(models.Model):
     )
     review_note = models.TextField(blank=True, help_text="Ghi chú của Trưởng bộ môn khi duyệt/từ chối/yêu cầu sửa")
 
-    # Vector embedding ngữ nghĩa (Groq nomic-embed-text-v1_5), lưu bằng pgvector để tra cứu lân cận nhanh.
+    # Vector embedding PhoBERT, lưu bằng pgvector để tra cứu lân cận nhanh.
     # NULL khi mới tạo, được tính bất đồng bộ/đồng bộ ngay sau khi save (xem services/similarity.py)
     embedding = VectorField(dimensions=EMBEDDING_DIM, null=True, blank=True)
 
@@ -156,3 +156,67 @@ class TopicDeletionAudit(models.Model):
 
     def __str__(self):
         return f"Đã xóa #{self.original_topic_id} - {self.title}"
+
+
+class Technology(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    category = models.CharField(max_length=50, default="Khác")
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["category", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class TopicTechnology(models.Model):
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="technologies")
+    technology = models.ForeignKey(
+        Technology, on_delete=models.PROTECT, related_name="topic_uses"
+    )
+    is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("topic", "technology"), name="uniq_topic_technology"
+            )
+        ]
+
+
+class TopicFunction(models.Model):
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="functions")
+    function_name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.topic.title}: {self.function_name}"
+
+
+class TopicDocument(models.Model):
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="documents")
+    file = models.FileField(upload_to="topic-documents/%Y/%m/")
+    file_name = models.CharField(max_length=255)
+    file_type = models.CharField(max_length=10)
+    file_size = models.PositiveBigIntegerField()
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="topic_documents",
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at", "-id"]
+
+    def __str__(self):
+        return self.file_name

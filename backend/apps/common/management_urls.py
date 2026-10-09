@@ -7,6 +7,7 @@ mà không ảnh hưởng tới API nghiệp vụ dùng chung cho Giảng viên/
 from django.urls import include, path
 
 urlpatterns = [
+    path("people/", include("apps.accounts.people_urls")),
     path("users/", include("apps.accounts.management_urls")),
     path("topics/", include("apps.topics.management_urls")),
 ]

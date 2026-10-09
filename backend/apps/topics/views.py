@@ -1,21 +1,45 @@
 from django.db import transaction
+from django.http import FileResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.common.permissions import IsAdmin, IsTeacher, IsTopicOwnerOrAdmin
+from apps.common.permissions import IsAdmin, IsTeacher, IsTopicOwnerOrAdmin, ReadOnlyOrAdmin
 
-from .models import Topic, TopicAssignment, TopicDeletionAudit, TopicHistory
+from .models import (
+    Technology,
+    Topic,
+    TopicAssignment,
+    TopicDeletionAudit,
+    TopicDocument,
+    TopicFunction,
+    TopicHistory,
+    TopicTechnology,
+)
 from .serializers import (
     AssignTopicSerializer,
     TopicAssignmentSerializer,
     TopicCreateSerializer,
+    TopicDocumentSerializer,
+    TopicFunctionSerializer,
     TopicHistorySerializer,
     TopicSerializer,
     TopicSimilarityResultSerializer,
+    TopicTechnologySerializer,
+    TechnologySerializer,
+    SimilarityCheckRequestSerializer,
 )
-from .services.similarity import find_similar_topics
+from .services.document_extraction import FileExtractionError, extract_document_text, find_title_candidates
+from .services.similarity import (
+    classify_warning_level,
+    find_similar_topics,
+    get_embedding,
+    is_exact_duplicate,
+    normalize_text,
+)
 from .services.workflow import assign_topic, propose_topic, refresh_similarity_results
 
 
@@ -214,7 +238,9 @@ class TopicViewSet(viewsets.ModelViewSet):
 
 class TopicAssignmentViewSet(viewsets.ReadOnlyModelViewSet):
     """/api/v1/topics/assignments/ — tra cứu các lượt giao đề tài."""
-    queryset = TopicAssignment.objects.select_related("topic", "assigned_by").prefetch_related("students")
+    queryset = TopicAssignment.objects.select_related(
+        "topic", "topic__proposed_by", "assigned_by"
+    ).prefetch_related("students")
     serializer_class = TopicAssignmentSerializer
     permission_classes = (IsAuthenticated,)
     filterset_fields = ("topic", "students")
@@ -227,3 +253,168 @@ class TopicAssignmentViewSet(viewsets.ReadOnlyModelViewSet):
         if user.role == "teacher":
             return qs.filter(assigned_by=user)
         return qs
+
+
+class TopicResourcePermission(IsAuthenticated):
+    message = "Chỉ Admin hoặc giảng viên sở hữu đề tài mới được sửa thông tin này."
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        return request.method in ("GET", "HEAD", "OPTIONS") or request.user.role in ("admin", "teacher")
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return True
+        return request.user.role == "admin" or obj.topic.proposed_by_id == request.user.id
+
+
+class TopicResourceViewSet(viewsets.ModelViewSet):
+    permission_classes = (TopicResourcePermission,)
+    filterset_fields = ("topic",)
+
+    def perform_create(self, serializer):
+        topic = serializer.validated_data["topic"]
+        if self.request.user.role != "admin" and topic.proposed_by_id != self.request.user.id:
+            raise PermissionDenied(TopicResourcePermission.message)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        topic = serializer.validated_data.get("topic", serializer.instance.topic)
+        if self.request.user.role != "admin" and topic.proposed_by_id != self.request.user.id:
+            raise PermissionDenied(TopicResourcePermission.message)
+        serializer.save()
+
+
+class TechnologyViewSet(viewsets.ModelViewSet):
+    queryset = Technology.objects.all()
+    serializer_class = TechnologySerializer
+    permission_classes = (ReadOnlyOrAdmin,)
+    search_fields = ("name", "category", "description")
+    ordering_fields = ("name", "category", "created_at")
+
+
+class TopicTechnologyViewSet(TopicResourceViewSet):
+    queryset = TopicTechnology.objects.select_related("topic", "technology").all()
+    serializer_class = TopicTechnologySerializer
+
+
+class TopicFunctionViewSet(TopicResourceViewSet):
+    queryset = TopicFunction.objects.select_related("topic").all()
+    serializer_class = TopicFunctionSerializer
+
+
+class TopicDocumentViewSet(TopicResourceViewSet):
+    queryset = TopicDocument.objects.select_related("topic", "uploaded_by").all()
+    serializer_class = TopicDocumentSerializer
+    parser_classes = (MultiPartParser, FormParser)
+    search_fields = ("file_name",)
+    ordering_fields = ("uploaded_at", "file_name")
+
+    def perform_create(self, serializer):
+        topic = serializer.validated_data["topic"]
+        if self.request.user.role != "admin" and topic.proposed_by_id != self.request.user.id:
+            raise PermissionDenied(TopicResourcePermission.message)
+        serializer.save(uploaded_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        stored_file = instance.file
+        instance.delete()
+        if stored_file:
+            stored_file.delete(save=False)
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        document = self.get_object()
+        if not document.file:
+            raise NotFound("Tệp đính kèm không còn tồn tại.")
+        return FileResponse(
+            document.file.open("rb"),
+            as_attachment=True,
+            filename=document.file_name,
+        )
+
+
+class SimilarityCheckViewSet(viewsets.GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+
+    def _ensure_not_student(self, user):
+        if user.role == "student":
+            raise PermissionDenied("Sinh viên không có quyền chạy kiểm tra tương đồng.")
+
+    @action(detail=False, methods=["post"], url_path="check")
+    def check(self, request):
+        self._ensure_not_student(request.user)
+        serializer = SimilarityCheckRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        source_topic_id = data.get("source_topic_id")
+        title = data.get("title", "").strip()
+
+        if source_topic_id:
+            try:
+                source_topic = Topic.objects.get(pk=source_topic_id)
+            except Topic.DoesNotExist as error:
+                raise NotFound("Không tìm thấy đề tài được chọn.") from error
+            if not title:
+                title = source_topic.title
+
+        candidates = Topic.objects.filter(embedding__isnull=False)
+        if source_topic_id:
+            candidates = candidates.exclude(pk=source_topic_id)
+        existing_titles = list(candidates.values_list("title", flat=True))
+        if not existing_titles:
+            return Response({"query": title, "count": 0, "results": []})
+
+        from pgvector.django import CosineDistance
+
+        embedding = get_embedding(title)
+        exact_duplicate = is_exact_duplicate(title, existing_titles)
+        ranked = (
+            candidates.select_related(
+                "proposed_by", "department", "field", "cohort", "academic_year", "semester"
+            )
+            .annotate(distance=CosineDistance("embedding", embedding))
+            .order_by("distance")[:data["top_k"]]
+        )
+        results = []
+        for topic in ranked:
+            percent = round(max(0.0, min(100.0, (1 - topic.distance) * 100)), 2)
+            exact_match = exact_duplicate and normalize_text(topic.title) == normalize_text(title)
+            if exact_match:
+                percent = 100.0
+            level = "duplicate" if exact_match else classify_warning_level(percent)
+            results.append({
+                "topic_id": topic.pk,
+                "title": topic.title,
+                "topic_title": topic.title,
+                "similarity": percent / 100,
+                "percent": percent,
+                "similarity_percent": percent,
+                "warning": level,
+                "warning_level": level,
+            })
+        return Response({"query": title, "count": len(results), "results": results})
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="extract-file",
+        parser_classes=(MultiPartParser, FormParser),
+    )
+    def extract_file(self, request):
+        self._ensure_not_student(request.user)
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            raise ValidationError({"file": "Hãy chọn một tệp PDF hoặc DOCX."})
+        try:
+            text = extract_document_text(uploaded_file)
+        except FileExtractionError as error:
+            raise ValidationError({"file": str(error)}) from error
+
+        candidates = find_title_candidates(text)
+        return Response({
+            "title_candidates": candidates,
+            "suggested_title": candidates[0]["title"] if candidates else "",
+            "preview_text": text[:5000],
+        })

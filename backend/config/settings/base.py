@@ -143,9 +143,9 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
 CORS_ALLOW_CREDENTIALS = True
 
-# ===== Groq API (đọc từ biến môi trường, KHÔNG hard-code) =====
-GROQ_API_KEY = env("GROQ_API_KEY", default="")
-GROQ_EMBEDDING_MODEL = env("GROQ_EMBEDDING_MODEL", default="nomic-embed-text-v1_5")
+# ===== PhoBERT similarity service (chạy độc lập với Django) =====
+PHOBERT_API_URL = env("PHOBERT_API_URL", default="http://127.0.0.1:8001").rstrip("/")
+PHOBERT_API_TIMEOUT = env.int("PHOBERT_API_TIMEOUT", default=60)
 
 # ===== Ngưỡng cảnh báo tương đồng đề tài (%) — có thể chỉnh qua .env mà không cần sửa code =====
 SIMILARITY_THRESHOLD_REVIEW = env.float("SIMILARITY_THRESHOLD_REVIEW", default=50.0)

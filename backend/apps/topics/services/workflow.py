@@ -9,7 +9,7 @@ from .similarity import find_similar_topics, get_embedding, is_exact_duplicate, 
 @transaction.atomic
 def refresh_similarity_results(topic: Topic):
     """Recompute the topic vector and replace its persisted similarity snapshot."""
-    topic.embedding = get_embedding(f"{topic.title}\n{topic.description}")
+    topic.embedding = get_embedding(topic.title)
     topic.save(update_fields=["embedding"])
 
     results = find_similar_topics(topic)
@@ -44,7 +44,7 @@ def propose_topic(topic: Topic, actor):
     Được gọi ngay sau khi Giảng viên tạo đề tài mới. Chạy đủ 2 bước kiểm tra (theo đúng
     Chương 2, mục 2.1.5):
       Bước 1 — kiểm tra trùng tên chính xác (so khớp chuỗi, không cần AI).
-      Bước 2 — tính embedding + xếp hạng tương đồng ngữ nghĩa qua pgvector.
+      Bước 2 — tính embedding PhoBERT + xếp hạng tương đồng ngữ nghĩa qua pgvector.
     (Bước lọc TF-IDF trong similarity.py là hàm tối ưu tùy chọn, không bắt buộc trong pipeline
     vì pgvector đã tự làm truy vấn lân cận gần nhất hiệu quả — xem ghi chú trong similarity.py)
     """

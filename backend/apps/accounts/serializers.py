@@ -63,12 +63,15 @@ class UserManagementSerializer(serializers.ModelSerializer):
 
     password = serializers.CharField(write_only=True, min_length=8, required=False)
     email = serializers.EmailField(required=True, allow_blank=False)
+    department_name = serializers.CharField(source="department.name", read_only=True, allow_null=True)
+    cohort_name = serializers.CharField(source="cohort.name", read_only=True, allow_null=True)
 
     class Meta:
         model = User
         fields = (
             "id", "username", "email", "password", "first_name", "last_name",
             "role", "avatar", "phone_number", "department", "cohort", "student_code", "is_active",
+            "department_name", "cohort_name",
         )
         read_only_fields = ("id", "avatar")
 
@@ -135,6 +138,57 @@ class UserManagementSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class PeopleProfileSerializer(serializers.ModelSerializer):
+    """Manager-maintained academic profile without creating login credentials."""
+
+    role = serializers.ChoiceField(choices=("teacher", "student"))
+    email = serializers.EmailField(required=False, allow_blank=True)
+    department_name = serializers.CharField(source="department.name", read_only=True, allow_null=True)
+    cohort_name = serializers.CharField(source="cohort.name", read_only=True, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = (
+            "id", "username", "email", "first_name", "last_name", "role",
+            "phone_number", "department", "department_name", "cohort",
+            "cohort_name", "student_code", "is_active",
+        )
+        read_only_fields = ("id", "is_active")
+
+    def validate_email(self, value):
+        if value:
+            existing = User.objects.filter(email__iexact=value).exclude(
+                pk=self.instance.pk if self.instance else None
+            )
+            if existing.exists():
+                raise serializers.ValidationError("Email này đã được sử dụng.")
+        return value
+
+    def validate_username(self, value):
+        username = value.strip()
+        existing = User.objects.filter(username__iexact=username).exclude(
+            pk=self.instance.pk if self.instance else None
+        )
+        if existing.exists():
+            raise serializers.ValidationError("Tên đăng nhập này đã được sử dụng.")
+        return username
+
+    def validate(self, attrs):
+        role = attrs.get("role", self.instance.role if self.instance else None)
+        if self.instance and role != self.instance.role:
+            raise serializers.ValidationError({"role": "Không thể đổi vai trò trong màn hình hồ sơ."})
+        cohort = attrs.get("cohort", self.instance.cohort if self.instance else None)
+        if role != User.Role.STUDENT and cohort is not None:
+            raise serializers.ValidationError({"cohort": "Chỉ hồ sơ sinh viên mới được gắn khóa học."})
+        return attrs
+
+    def create(self, validated_data):
+        person = User(**validated_data)
+        person.set_unusable_password()
+        person.save()
+        return person
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
