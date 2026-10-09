@@ -2,8 +2,8 @@ from django.conf import settings
 from django.db import models
 from pgvector.django import VectorField
 
-# Kích thước vector của model embedding Groq (nomic-embed-text-v1_5) = 768 chiều.
-# Nếu đổi model embedding khác, PHẢI đổi số này cho khớp rồi chạy lại migration.
+# Cột vector cũ được giữ lại để tương thích dữ liệu/migration hiện có. Pipeline similarity hiện tại
+# dùng TF-IDF + Groq semantic scoring và không đọc/ghi trường này.
 EMBEDDING_DIM = 768
 
 
@@ -47,8 +47,7 @@ class Topic(models.Model):
     )
     review_note = models.TextField(blank=True, help_text="Ghi chú của Trưởng bộ môn khi duyệt/từ chối/yêu cầu sửa")
 
-    # Vector embedding ngữ nghĩa (Groq nomic-embed-text-v1_5), lưu bằng pgvector để tra cứu lân cận nhanh.
-    # NULL khi mới tạo, được tính bất đồng bộ/đồng bộ ngay sau khi save (xem services/similarity.py)
+    # Trường tương thích ngược; không còn được dùng để xếp hạng tương đồng.
     embedding = VectorField(dimensions=EMBEDDING_DIM, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

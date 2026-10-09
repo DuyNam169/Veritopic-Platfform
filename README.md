@@ -20,8 +20,9 @@ và chính xác hơn.
 **Phát hiện trùng lặp / tương đồng (chức năng lõi)**
 - Kiểm tra trùng tên chính xác
 - Kiểm tra đề tài gần giống theo từ khóa (TF-IDF + Cosine Similarity)
-- Tính mức độ tương đồng ngữ nghĩa giữa đề tài mới và đề tài cũ (Vector Embedding qua Groq API,
-  lưu trữ bằng PostgreSQL + pgvector)
+- Lọc ứng viên gần giống trên toàn bộ ngân hàng đề tài bằng TF-IDF từ và ký tự
+- Dùng mô hình ngôn ngữ Groq chấm tương đồng ngữ nghĩa theo rubric cố định, kết hợp với điểm TF-IDF
+  và lưu snapshot kết quả trong PostgreSQL
 - Hiển thị Top đề tài tương đồng nhất kèm tỉ lệ %
 - Cảnh báo theo ngưỡng:
 
@@ -51,7 +52,7 @@ và chính xác hơn.
 | Frontend | TypeScript + React + Vite + Tailwind CSS |
 | Backend | Django + Django REST Framework (RESTful API) |
 | Database | PostgreSQL + pgvector |
-| AI | Groq API (Embeddings — model `nomic-embed-text-v1_5`) |
+| AI | Groq API (chấm tương đồng ngữ nghĩa — mặc định `qwen/qwen3.8-27b`) |
 | Đóng gói / triển khai | Docker + Docker Compose |
 | Auth | JWT (`djangorestframework-simplejwt`) |
 | Export | openpyxl (Excel), WeasyPrint (PDF) |
@@ -174,6 +175,17 @@ Lần đầu chạy sẽ tự động: build image, chờ Postgres sẵn sàng, 
 docker compose exec backend python manage.py createsuperuser
 ```
 
+**Dữ liệu mẫu Khoa CNTT UTT (dành cho phát triển/kiểm thử)**
+```bash
+docker compose exec backend python manage.py seed_utt_demo
+```
+
+Lệnh có thể chạy lại an toàn: dữ liệu mẫu được cập nhật thay vì nhân bản. Bộ dữ liệu gồm 5 bộ môn,
+5 khóa học, 4 năm học, 12 lĩnh vực, tài khoản đủ 4 vai trò, 30 đề tài với nhiều trạng thái, lịch sử
+duyệt và phân công nhóm. Kết quả tương đồng được tạo bằng thuật toán thật khi đề tài được đề xuất hoặc
+Admin bấm “Chạy lại kiểm tra”. Tất cả tên người, email, số điện thoại và mã sinh viên
+đều là dữ liệu giả lập; mật khẩu chung cho các tài khoản demo là `Veritopic@2026`.
+
 ### 4.3. Lệnh thường dùng khi phát triển
 
 ```bash
@@ -233,9 +245,8 @@ git rm --cached backend/.env frontend/.env
 2. **`GROQ_API_KEY` bắt buộc phải có** trong `backend/.env` thì chức năng tạo đề tài mới (tự động chạy
    kiểm tra tương đồng) mới hoạt động. Nếu chưa có key, `apps/topics/services/similarity.py` sẽ raise lỗi
    rõ ràng thay vì lỗi khó hiểu.
-3. **Groq free tier có giới hạn rate limit.** Nếu viết script test tạo hàng loạt đề tài (seed data), nên
-   thêm `time.sleep()` giữa các lần gọi hoặc cache lại embedding đã tính, tránh bị chặn request giữa lúc
-   demo.
+3. **Groq free tier có giới hạn rate limit.** Mỗi lần tạo đề tài hoặc bấm chạy lại sẽ có một yêu cầu
+   chấm ngữ nghĩa cho nhóm ứng viên đã được TF-IDF lọc. Không chạy hàng loạt liên tục khi demo.
 4. **Mỗi khi sửa `models.py`** trong bất kỳ app nào, phải chạy `makemigrations` rồi `migrate` (xem mục
    4.3), nếu không DB sẽ không khớp với code.
 5. **Ngưỡng cảnh báo tương đồng (`SIMILARITY_THRESHOLD_*`) đọc từ `.env`**, không hard-code trong code —
@@ -248,9 +259,9 @@ git rm --cached backend/.env frontend/.env
    các route này được chặn thêm ở Frontend bằng `RoleGuard` (`shared/components/RoleGuard.tsx`) để ẩn UI,
    nhưng **bảo mật thật sự nằm ở Backend** (`IsAdminOrDepartmentHead`, `IsAdmin` trong
    `apps/common/permissions.py`) — không được xóa permission ở Backend dù đã chặn UI ở Frontend.
-8. **pgvector**: dùng image `pgvector/pgvector:pg16` thay vì `postgres:16` thường (đã cấu hình sẵn trong
-   `docker-compose.yml`). Nếu đổi sang model embedding khác của Groq (số chiều vector khác 768), phải sửa
-   `EMBEDDING_DIM` trong `apps/topics/models.py` rồi tạo lại migration.
+8. **Cấu hình similarity**: `SIMILARITY_PREFILTER_TOP_K` quy định số ứng viên đưa sang bước chấm AI,
+   `SIMILARITY_MIN_DISPLAY` loại kết quả quá thấp và `SIMILARITY_TOP_N` giới hạn số kết quả cuối.
+   Model Groq được chọn bằng `GROQ_SIMILARITY_MODEL`.
 9. **WeasyPrint (xuất PDF)** cần system dependencies đã cài sẵn trong `backend/Dockerfile`. Nếu chạy
    Backend ngoài Docker (không khuyến khích), phải tự cài `libpango`, `libcairo`, `libgdk-pixbuf` theo hệ
    điều hành đang dùng.

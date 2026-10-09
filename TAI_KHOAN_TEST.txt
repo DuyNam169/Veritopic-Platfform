@@ -7,15 +7,29 @@ Mật khẩu dùng chung: Veritopic@2026
    Username: admin_test
 
 2. Trưởng bộ môn
-   Username: tbm_test
+   Hệ thống thông tin: tbm_test
+   Công nghệ phần mềm: tbm_cnpm
+   Truyền thông và Mạng máy tính: tbm_mang
+   Điện tử viễn thông: tbm_dtvt
+   Cơ điện tử: tbm_cdt
 
 3. Giảng viên
-   Username: gv_test
+   Hệ thống thông tin: gv_test, gv_thanhson
+   Công nghệ phần mềm: gv_ngocanh, gv_minhquan
+   Truyền thông và Mạng máy tính: gv_thuha, gv_quanghuy
+   Điện tử viễn thông: gv_hoangnam, gv_kimngan
+   Cơ điện tử: gv_ducanh, gv_phuongthao
 
 4. Sinh viên
-   Username: sv_test
+   Tài khoản chính: sv_test
+   K73: sv_73_02 đến sv_73_06
+   K74: sv_74_01 đến sv_74_06
+   K75: sv_75_01 đến sv_75_04
+   K76: sv_76_01 đến sv_76_02
 
 Truy cập ứng dụng: http://localhost:5173
 API Backend: http://localhost:8000
 
-Lưu ý: Đây là các tài khoản mẫu dành riêng cho môi trường phát triển/kiểm thử.
+Lưu ý: Đây là dữ liệu giả lập dành riêng cho môi trường phát triển/kiểm thử.
+Có thể nạp/cập nhật lại bằng lệnh:
+docker compose exec backend python manage.py seed_utt_demo
