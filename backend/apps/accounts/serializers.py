@@ -11,6 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "username", "email", "first_name", "last_name",
             "role", "phone_number", "department", "student_code",
+            "class_name", "cohort",
         )
         read_only_fields = ("id",)
 
@@ -42,3 +43,33 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["role"] = user.role
         token["full_name"] = user.get_full_name() or user.username
         return token
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Không tìm thấy tài khoản với email này.")
+        return value
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_new_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(value)
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+    def validate_new_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(value)
+        return value

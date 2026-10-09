@@ -55,3 +55,27 @@ class ReadOnlyOrAdmin(BasePermission):
         if request.method in self.SAFE_METHODS:
             return True
         return request.user.role == "admin"
+
+
+class IsTeacherOrAdmin(BasePermission):
+    message = "Chỉ Giảng viên hoặc Quản trị viên mới có quyền thực hiện thao tác này."
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("teacher", "admin")
+        )
+
+
+class IsTopicOwner(BasePermission):
+    """Object-level permission: Chỉ người đề xuất đề tài (hoặc Admin) mới có quyền chỉnh sửa/thao tác."""
+    message = "Bạn không phải người tạo đề tài này."
+
+    def has_object_permission(self, request, view, obj):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.user.role == "admin":
+            return True
+        return hasattr(obj, "proposed_by") and obj.proposed_by == request.user
+

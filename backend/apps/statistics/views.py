@@ -12,6 +12,11 @@ from .exporters.pdf_exporter import export_topics_to_pdf
 
 def _filtered_topics(request):
     qs = Topic.objects.select_related("department", "field", "cohort", "academic_year", "semester", "proposed_by")
+    if request.user.role == "teacher":
+        qs = qs.filter(proposed_by=request.user)
+    elif request.user.role == "student":
+        qs = qs.filter(status=Topic.Status.APPROVED)
+
     for param, field in (
         ("academic_year", "academic_year_id"),
         ("cohort", "cohort_id"),

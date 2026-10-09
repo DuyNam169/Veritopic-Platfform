@@ -21,3 +21,11 @@ export function useRejectTopic() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["management", "topics", "pending"] }),
   });
 }
+
+export function useRequestRenameTopic() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, note }: { id: number; note?: string }) => approvalApi.requestRename(id, note),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["management", "topics", "pending"] }),
+  });
+}

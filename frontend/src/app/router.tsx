@@ -10,21 +10,36 @@ import ApprovalPage from "@/features/approval/pages/ApprovalPage";
 import StatisticsPage from "@/features/statistics/pages/StatisticsPage";
 import TopicDetailPage from "@/features/topics/pages/TopicDetailPage";
 import TopicListPage from "@/features/topics/pages/TopicListPage";
+import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
+import ResetPasswordPage from "@/features/auth/ResetPasswordPage";
+
+// Teacher pages
+import { TeacherDashboardPage } from "@/features/teacher/pages/TeacherDashboardPage";
+import { ProposeTopicPage } from "@/features/teacher/pages/ProposeTopicPage";
+import { MyTopicsPage } from "@/features/teacher/pages/MyTopicsPage";
+import { EditResubmitPage } from "@/features/teacher/pages/EditResubmitPage";
+import { MyStudentsPage } from "@/features/teacher/pages/MyStudentsPage";
+import { ProgressListPage } from "@/features/teacher/pages/ProgressListPage";
+import { ProgressDetailPage } from "@/features/teacher/pages/ProgressDetailPage";
 
 /**
  * Route quản lý riêng (Duyệt đề tài, Danh mục hệ thống) được tách nhóm bằng RoleGuard,
  * khớp với route /api/v1/management/ ở Backend — chỉ admin/department_head vào được /approval,
  * chỉ admin vào được /academics.
  */
+import HomeRedirect from "@/shared/components/HomeRedirect";
+
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
   {
     element: <PrivateRoute />,
     children: [
       {
         element: <AppLayout />,
         children: [
-          { path: "/", element: <TopicListPage /> },
+          { path: "/", element: <HomeRedirect /> },
           { path: "/topics", element: <TopicListPage /> },
           { path: "/topics/:id", element: <TopicDetailPage /> },
           { path: "/statistics", element: <StatisticsPage /> },
@@ -36,8 +51,22 @@ export const router = createBrowserRouter([
             element: <RoleGuard allow={["admin"]} />,
             children: [{ path: "/academics", element: <AcademicsPage /> }],
           },
+          // ---- Teacher-only routes ----
+          {
+            element: <RoleGuard allow={["teacher"]} />,
+            children: [
+              { path: "/teacher", element: <TeacherDashboardPage /> },
+              { path: "/teacher/propose", element: <ProposeTopicPage /> },
+              { path: "/teacher/topics", element: <MyTopicsPage /> },
+              { path: "/teacher/topics/:id/edit", element: <EditResubmitPage /> },
+              { path: "/teacher/students", element: <MyStudentsPage /> },
+              { path: "/teacher/progress", element: <ProgressListPage /> },
+              { path: "/teacher/progress/:assignmentId", element: <ProgressDetailPage /> },
+            ],
+          },
         ],
       },
     ],
   },
 ]);
+

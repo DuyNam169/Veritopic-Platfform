@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 import { useLogin } from "./hooks";
 import type { LoginPayload } from "./api";
@@ -9,14 +9,25 @@ export default function LoginPage() {
   const loginMutation = useLogin();
   const navigate = useNavigate();
 
-  const onSubmit = (data: LoginPayload) => {
-    loginMutation.mutate(data, { onSuccess: () => navigate("/") });
+  const onSubmit = async (data: LoginPayload) => {
+    try {
+      const res = await loginMutation.mutateAsync(data) as any;
+      if (res?.role === "teacher" || res?.user?.role === "teacher") {
+        navigate("/teacher");
+      } else if (res?.role === "department_head" || res?.role === "admin" || res?.user?.role === "department_head" || res?.user?.role === "admin") {
+        navigate("/approval");
+      } else {
+        navigate("/");
+      }
+    } catch {
+      // Đã xử lý lỗi ở loginMutation.isError
+    }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm space-y-4 rounded-lg bg-white p-8 shadow">
-        <h1 className="text-center text-xl font-semibold">Đăng nhập</h1>
+        <h1 className="text-center text-xl font-semibold">Đăng nhập </h1>
         <input
           {...register("username", { required: true })}
           placeholder="Tên đăng nhập"
@@ -38,6 +49,12 @@ export default function LoginPage() {
         >
           {loginMutation.isPending ? "Đang đăng nhập..." : "Đăng nhập"}
         </button>
+
+        <div className="text-center mt-2">
+          <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
+            Quên mật khẩu?
+          </Link>
+        </div>
       </form>
     </div>
   );

@@ -5,10 +5,21 @@ import { useAuthStore } from "./store";
 
 export function useLogin() {
   const setAuth = useAuthStore((s) => s.setAuth);
+  const setUser = useAuthStore((s) => s.setUser);
 
   return useMutation({
     mutationFn: (payload: LoginPayload) => authApi.login(payload),
-    onSuccess: (data) => setAuth(data.access, data.refresh),
+    onSuccess: async (data) => {
+      setAuth(data.access, data.refresh);
+      try {
+        const user = await authApi.me();
+        setUser(user);
+        return user;
+      } catch (e) {
+        console.error("Failed to fetch user after login", e);
+        return null;
+      }
+    },
   });
 }
 

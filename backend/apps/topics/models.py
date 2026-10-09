@@ -16,6 +16,9 @@ class Topic(models.Model):
 
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True)
+    keywords = models.JSONField(default=list, blank=True, help_text="Danh sách từ khóa đề tài (dạng array chuỗi)")
+    max_students = models.PositiveSmallIntegerField(default=1, help_text="Số lượng sinh viên tối đa được giao")
+    requirements = models.TextField(blank=True, help_text="Yêu cầu thực hiện đề tài")
 
     department = models.ForeignKey(
         "academics.Department", on_delete=models.PROTECT, related_name="topics"
@@ -67,6 +70,11 @@ class Topic(models.Model):
 
 class TopicAssignment(models.Model):
     """Giao đề tài cho sinh viên hoặc nhóm sinh viên."""
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Đang thực hiện"
+        COMPLETED = "completed", "Đã hoàn thành"
+        CANCELLED = "cancelled", "Đã hủy"
+
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="assignments")
     students = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -76,6 +84,8 @@ class TopicAssignment(models.Model):
     assigned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="assignments_made"
     )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    due_date = models.DateField(null=True, blank=True, help_text="Thời hạn hoàn thành đồ án")
     assigned_at = models.DateTimeField(auto_now_add=True)
     note = models.TextField(blank=True)
 
@@ -91,6 +101,7 @@ class TopicHistory(models.Model):
     class Action(models.TextChoices):
         CREATED = "created", "Tạo mới"
         UPDATED = "updated", "Cập nhật"
+        RESUBMITTED = "resubmitted", "Nộp lại"
         APPROVED = "approved", "Duyệt"
         REJECTED = "rejected", "Từ chối"
         RENAME_REQUESTED = "rename_requested", "Yêu cầu sửa tên"

@@ -13,5 +13,8 @@ export default defineConfig({
   server: {
     host: true, // cho phép truy cập từ ngoài container Docker
     port: 5173,
+    watch: {
+      usePolling: true,
+    },
   },
 });

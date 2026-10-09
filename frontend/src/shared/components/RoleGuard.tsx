@@ -14,7 +14,8 @@ interface Props {
 export default function RoleGuard({ allow }: Props) {
   const role = useAuthStore((s) => s.user?.role);
   if (!role || !allow.includes(role)) {
-    return <Navigate to="/" replace />;
+    const fallbackPath = role === "teacher" ? "/teacher" : role === "department_head" || role === "admin" ? "/approval" : "/topics";
+    return <Navigate to={fallbackPath} replace />;
   }
   return <Outlet />;
 }

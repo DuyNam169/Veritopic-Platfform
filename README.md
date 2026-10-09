@@ -263,3 +263,77 @@ git rm --cached backend/.env frontend/.env
 - CRUD UI đầy đủ cho trang Danh mục hệ thống (`features/academics/pages/AcademicsPage.tsx` hiện mới có khung)
 - Trang đăng ký tài khoản (`RegisterView` đã có ở Backend, Frontend chưa có UI)
 - Thông báo (notification) khi đề tài được duyệt/từ chối/yêu cầu sửa tên
+
+## 8. Lịch sử cập nhật — Chức năng gửi mã OTP qua email thật
+
+#### ✅ Các bước để chạy được chức năng gửi OTP
+**Bước 1 — Bật 2-Step Verification trên Gmail**
+
+> ⚠️ Bước này **bắt buộc** — nếu chưa bật 2FA thì không tạo được App Password.
+
+1. Truy cập [myaccount.google.com](https://myaccount.google.com)
+2. Chọn **Security** (Bảo mật) ở thanh bên trái
+3. Tìm mục **How you sign in to Google** → chọn **2-Step Verification**
+4. Làm theo hướng dẫn để kích hoạt
+
+---
+
+**Bước 2 — Tạo Gmail App Password**
+
+1. Vẫn trong trang **Security**, sau khi đã bật 2FA
+2. Tìm mục **App Passwords** (Mật khẩu ứng dụng)  
+   *(Nếu không thấy, tìm kiếm "App Passwords" trong thanh tìm kiếm của myaccount.google.com)*
+3. Nhấn **Create** → đặt tên: `Veritopic` → nhấn **Create**
+4. Google hiển thị mã **16 ký tự** dạng `xxxx xxxx xxxx xxxx`  
+   → **Lưu ngay lập tức** — Google chỉ hiển thị một lần duy nhất
+
+---
+
+**Bước 3 — Điền thông tin vào `backend/.env`**
+
+Mở file `backend/.env` và thêm / cập nhật các dòng sau:
+
+```env
+# ===== Gmail SMTP Configuration =====
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_USE_SSL=False
+
+# Địa chỉ Gmail dùng để gửi OTP
+EMAIL_HOST_USER=your_gmail@gmail.com
+
+# App Password vừa tạo ở Bước 2 (bỏ dấu cách, chỉ 16 ký tự liên tiếp)
+EMAIL_HOST_PASSWORD=xxxxxxxxxxxxxxxx
+
+# Tên hiển thị trong hộp thư người nhận
+DEFAULT_FROM_EMAIL=Veritopic <your_gmail@gmail.com>
+```
+
+**Bước 4 — Khởi động lại toàn bộ hệ thống**
+
+```bash
+docker compose down
+docker compose up --build
+```
+
+> Lần đầu `--build` để Docker nạp lại các biến môi trường từ `.env` mới.
+
+---
+
+**Bước 5 — Kiểm tra chức năng**
+
+1. Mở trình duyệt vào `http://localhost:5173`
+2. Ở trang đăng nhập, nhấn **"Quên mật khẩu?"**
+3. Nhập địa chỉ email đã đăng ký trong hệ thống
+4. Kiểm tra hộp thư Gmail — sẽ nhận được email chứa mã OTP 6 chữ số
+5. Nhập mã OTP + mật khẩu mới → nhấn xác nhận
+
+---
+#### 🔒 Lưu ý bảo mật
+
+- Nếu lộ App Password hoặc nghi ngờ bị lộ, thu hồi ngay tại:  
+  [myaccount.google.com → Security → App Passwords](https://myaccount.google.com/apppasswords) → xóa mã cũ → tạo mã mới → cập nhật lại `.env`.
+- OTP có thời hạn sử dụng và chỉ dùng được **một lần** (được kiểm tra qua trường `is_used` trong model `OTPRecord`).
+
+

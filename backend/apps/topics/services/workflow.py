@@ -91,10 +91,104 @@ def request_rename(topic: Topic, actor, note: str = ""):
 
 
 @transaction.atomic
-def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = ""):
+def resubmit_topic(topic: Topic, actor, updated_data: dict):
+    """
+    Nộp lại đề tài sau khi có 'Yêu cầu sửa' từ Trưởng bộ môn.
+    Chuyển trạng thái từ rename_requested -> pending, tính lại embedding & kiểm tra tương đồng.
+    """
+    from rest_framework.exceptions import ValidationError
+
+    if topic.status != Topic.Status.RENAME_REQUESTED:
+        raise ValidationError({"detail": f"Đề tài ở trạng thái '{topic.get_status_display()}' không thể nộp lại. Chỉ nộp lại khi có 'Yêu cầu sửa'."})
+
+    if actor.role != "admin" and topic.proposed_by != actor:
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied("Chỉ giảng viên đề xuất mới được nộp lại đề tài này.")
+
+    for field, val in updated_data.items():
+        setattr(topic, field, val)
+
+    topic.status = Topic.Status.PENDING
+    topic.save()
+
+    # Chạy lại tính embedding và snapshot tương đồng
+    propose_result = propose_topic(topic, actor=actor)
+
+    # Ghi history action resubmitted
+    note = f"Nộp lại đề tài sau khi sửa theo yêu cầu của TBM. Ghi chú gốc của TBM: {topic.review_note}"
+    TopicHistory.objects.create(
+        topic=topic,
+        action=TopicHistory.Action.RESUBMITTED,
+        actor=actor,
+        note=note,
+    )
+    return topic, propose_result
+
+
+@transaction.atomic
+def assign_topic(topic: Topic, student_ids: list[int], actor, due_date=None, note: str = ""):
+    """
+    Giao đề tài cho nhóm sinh viên với các ràng buộc nghiêm ngặt:
+    1. Đề tài phải ở trạng thái APPROVED.
+    2. Đề tài phải thuộc Giảng viên giao (hoặc Admin).
+    3. Số sinh viên <= max_students.
+    4. Không sinh viên nào đã có lượt giao ACTIVE trong cùng HỌC KỲ.
+    """
+    from django.contrib.auth import get_user_model
+    from rest_framework.exceptions import ValidationError, PermissionDenied
     from apps.topics.models import TopicAssignment
 
-    assignment = TopicAssignment.objects.create(topic=topic, assigned_by=actor, note=note)
-    assignment.students.set(student_ids)
-    TopicHistory.objects.create(topic=topic, action=TopicHistory.Action.ASSIGNED, actor=actor, note=note)
+    User = get_user_model()
+
+    if topic.status != Topic.Status.APPROVED:
+        raise ValidationError({"detail": "Chỉ đề tài ở trạng thái 'Đã duyệt' mới được phép giao cho sinh viên."})
+
+    if actor.role != "admin" and topic.proposed_by != actor:
+        raise PermissionDenied("Chỉ giảng viên hướng dẫn của đề tài này mới có quyền giao đề tài.")
+
+    # 3. Kiểm tra tổng số sinh viên đã giao cho đề tài này (trong các lượt assignment đang active)
+    active_assignments = TopicAssignment.objects.filter(
+        topic=topic,
+        status=TopicAssignment.Status.ACTIVE,
+    )
+    currently_assigned_count = sum(a.students.count() for a in active_assignments)
+    
+    if currently_assigned_count + len(student_ids) > topic.max_students:
+        raise ValidationError({
+            "detail": f"Đề tài này chỉ cho phép tối đa {topic.max_students} sinh viên. "
+                      f"Hiện tại đã giao cho {currently_assigned_count} sinh viên, "
+                      f"bạn không thể giao thêm {len(student_ids)} sinh viên nữa."
+        })
+
+    students = User.objects.filter(id__in=student_ids, role="student", is_active=True)
+    if len(students) != len(student_ids):
+        raise ValidationError({"detail": "Một hoặc nhiều sinh viên không hợp lệ hoặc không hoạt động."})
+
+    # 4. Kiểm tra xem sinh viên đã có lượt giao active trong cùng học kỳ chưa
+    for s in students:
+        existing_assignment = TopicAssignment.objects.filter(
+            students=s,
+            status=TopicAssignment.Status.ACTIVE,
+            topic__semester=topic.semester,
+        ).exists()
+        if existing_assignment:
+            raise ValidationError({"detail": f"Sinh viên {s.get_full_name() or s.username} ({s.student_code}) đã có đồ án đang thực hiện trong học kỳ này."})
+
+    assignment = TopicAssignment.objects.create(
+        topic=topic,
+        assigned_by=actor,
+        status=TopicAssignment.Status.ACTIVE,
+        due_date=due_date,
+        note=note,
+    )
+    assignment.students.set(students)
+
+    student_names = ", ".join([s.get_full_name() or s.username for s in students])
+    TopicHistory.objects.create(
+        topic=topic,
+        action=TopicHistory.Action.ASSIGNED,
+        actor=actor,
+        note=f"Đã giao đề tài cho sinh viên: {student_names}. {note}".strip(),
+    )
     return assignment
+
