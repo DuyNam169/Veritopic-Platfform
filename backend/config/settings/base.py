@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.academics",
     "apps.topics",
     "apps.statistics",
+    "apps.progress",
     "apps.common",
 ]
 
@@ -152,3 +153,16 @@ SIMILARITY_THRESHOLD_REVIEW = env.float("SIMILARITY_THRESHOLD_REVIEW", default=5
 SIMILARITY_THRESHOLD_HIGH = env.float("SIMILARITY_THRESHOLD_HIGH", default=70.0)
 SIMILARITY_THRESHOLD_DUPLICATE = env.float("SIMILARITY_THRESHOLD_DUPLICATE", default=85.0)
 SIMILARITY_TOP_N = env.int("SIMILARITY_TOP_N", default=5)
+PROGRESS_LATE_AFTER_DAYS = env.int("PROGRESS_LATE_AFTER_DAYS", default=7)
+
+# ===== Email Configuration (Gmail SMTP) =====
+# Sử dụng Gmail SMTP với App Password (KHÔNG dùng mật khẩu Gmail thường).
+# Tạo App Password tại: myaccount.google.com → Security → 2-Step Verification → App Passwords
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=env("EMAIL_HOST_USER", default="noreply@veritopic.com"))

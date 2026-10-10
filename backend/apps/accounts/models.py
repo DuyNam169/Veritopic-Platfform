@@ -33,9 +33,21 @@ class User(AbstractUser):
         help_text="Khóa học của sinh viên",
     )
     student_code = models.CharField(max_length=30, blank=True, help_text="Mã số sinh viên (nếu role=student)")
+    class_name = models.CharField(max_length=50, blank=True, help_text="Tên lớp (nếu role=student)")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.get_role_display()})"
+
+
+class OTPRecord(models.Model):
+    """Lưu trữ mã OTP gửi qua email cho việc cấp lại mật khẩu."""
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.email} - {self.otp} - Used: {self.is_used}"
