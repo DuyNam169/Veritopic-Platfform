@@ -144,9 +144,14 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
 CORS_ALLOW_CREDENTIALS = True
 
+# ===== PhoBERT similarity service (chạy độc lập với Django) =====
+PHOBERT_API_URL = env("PHOBERT_API_URL", default="http://127.0.0.1:8001").rstrip("/")
+PHOBERT_API_TIMEOUT = env.int("PHOBERT_API_TIMEOUT", default=60)
+
 # ===== Groq API (đọc từ biến môi trường, KHÔNG hard-code) =====
+SIMILARITY_GROQ_ENABLED = env.bool("SIMILARITY_GROQ_ENABLED", default=False)
 GROQ_API_KEY = env("GROQ_API_KEY", default="")
-GROQ_EMBEDDING_MODEL = env("GROQ_EMBEDDING_MODEL", default="nomic-embed-text-v1_5")
+GROQ_SIMILARITY_MODEL = env("GROQ_SIMILARITY_MODEL", default="qwen/qwen3.8-27b")
 
 # ===== Ngưỡng cảnh báo tương đồng đề tài (%) — có thể chỉnh qua .env mà không cần sửa code =====
 SIMILARITY_THRESHOLD_REVIEW = env.float("SIMILARITY_THRESHOLD_REVIEW", default=50.0)
@@ -166,3 +171,6 @@ EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=env("EMAIL_HOST_USER", default="noreply@veritopic.com"))
+
+SIMILARITY_PREFILTER_TOP_K = env.int("SIMILARITY_PREFILTER_TOP_K", default=20)
+SIMILARITY_MIN_DISPLAY = env.float("SIMILARITY_MIN_DISPLAY", default=20.0)

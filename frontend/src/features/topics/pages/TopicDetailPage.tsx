@@ -8,6 +8,8 @@ import { useAuthStore } from "@/features/auth/store";
 import { Button, ErrorState, PageSkeleton, Panel, fieldClass } from "@/shared/components/ui";
 import { toast } from "@/shared/lib/toast";
 import { topicsApi } from "../api";
+import TopicResourcesPanel from "../components/TopicResourcesPanel";
+import { StoredSimilarityList } from "../components/StoredSimilarityList";
 import { useStoredSimilarityResults, useTopicDetail, useTopicHistory } from "../hooks";
 import type { Topic, TopicUpdatePayload } from "../types";
 
@@ -121,12 +123,17 @@ export default function TopicDetailPage() {
 
       {topic.review_note && <section className="rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-semibold text-amber-900">Phản hồi duyệt</h2><p className="mt-1 text-sm text-amber-800">{topic.review_note}</p></section>}
 
+      <TopicResourcesPanel
+        topicId={topic.id}
+        canEdit={isAdmin || (user?.role === "teacher" && user.id === topic.proposed_by)}
+      />
+
       <Panel>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-slate-900">Kết quả kiểm tra tương đồng đã lưu</h2>
           {isAdmin && <Button className="py-2 text-xs" busy={refreshSimilarity.isPending} onClick={() => refreshSimilarity.mutate()}>Chạy lại kiểm tra</Button>}
         </div>
-        {similarities.isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải...</p> : similarities.data?.length ? <div className="mt-3 space-y-2">{similarities.data.map((result) => <div key={result.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 text-sm"><Link to={`/topics/${result.similar_topic}`} className="font-medium text-blue-700 hover:underline">{result.similar_topic_title}</Link><span className="font-semibold text-slate-700">{result.similarity_percent.toFixed(1)}%</span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">Chưa có kết quả tương đồng được lưu.</p>}
+        {similarities.isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải...</p> : similarities.isError ? <p className="mt-3 text-sm text-rose-700">Không tải được kết quả tương đồng.</p> : <StoredSimilarityList results={similarities.data ?? []} />}
       </Panel>
 
       <Panel id="topic-history" className="scroll-mt-24">

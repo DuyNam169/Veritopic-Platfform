@@ -15,6 +15,7 @@ import {
   ClipboardList,
   PlusCircle,
   GraduationCap,
+  Search,
 } from "./icons";
 
 import { useAuthStore } from "@/features/auth/store";
@@ -79,6 +80,10 @@ export default function AppLayout() {
           <BookOpen className="w-4 h-4 shrink-0" />
           <span>Danh mục đề tài</span>
         </NavLink>
+        {user?.role !== "student" && <NavLink to="/topics/similarity" className={navLinkClass}>
+          <Search className="w-4 h-4 shrink-0" />
+          <span>Kiểm tra tương đồng</span>
+        </NavLink>}
         <NavLink to="/profile" className={navLinkClass}>
           <UserIcon className="w-4 h-4 shrink-0" />
           <span>Hồ sơ cá nhân</span>
@@ -121,6 +126,10 @@ export default function AppLayout() {
               <CheckSquare className="w-4 h-4 shrink-0" />
               <span>Duyệt đề tài</span>
             </NavLink>
+            <NavLink to="/people" className={navLinkClass}>
+              <Users className="w-4 h-4 shrink-0" />
+              <span>Giảng viên & sinh viên</span>
+            </NavLink>
           </>
         )}
 
@@ -138,6 +147,10 @@ export default function AppLayout() {
             <NavLink to="/academics" className={navLinkClass}>
               <Layers className="w-4 h-4 shrink-0" />
               <span>Danh mục hệ thống</span>
+            </NavLink>
+            <NavLink to="/technologies" className={navLinkClass}>
+              <Layers className="w-4 h-4 shrink-0" />
+              <span>Danh mục công nghệ</span>
             </NavLink>
             <NavLink to="/statistics" className={navLinkClass}>
               <BarChart3 className="w-4 h-4 shrink-0" />

@@ -1,8 +1,18 @@
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 
 from apps.accounts.serializers import UserSerializer
 
-from .models import Topic, TopicAssignment, TopicHistory, TopicSimilarityResult
+from .models import (
+    Technology,
+    Topic,
+    TopicAssignment,
+    TopicDocument,
+    TopicFunction,
+    TopicHistory,
+    TopicSimilarityResult,
+    TopicTechnology,
+)
 
 
 class TopicAcademicPeriodValidationMixin:
@@ -59,7 +69,7 @@ class TopicSimilarityResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TopicSimilarityResult
-        fields = ("id", "similar_topic", "similar_topic_title", "similarity_percent", "warning_level", "created_at")
+        fields = ("id", "similar_topic", "similar_topic_title", "similarity_percent", "warning_level", "groq_score", "groq_explanation", "assessment_status", "created_at")
 
 
 class TopicHistorySerializer(serializers.ModelSerializer):
@@ -77,11 +87,86 @@ class TopicHistorySerializer(serializers.ModelSerializer):
 
 class TopicAssignmentSerializer(serializers.ModelSerializer):
     students_detail = UserSerializer(source="students", many=True, read_only=True)
+    topic_title = serializers.CharField(source="topic.title", read_only=True)
+    proposed_by_detail = UserSerializer(source="topic.proposed_by", read_only=True)
 
     class Meta:
         model = TopicAssignment
-        fields = ("id", "topic", "students", "students_detail", "assigned_by", "assigned_at", "note")
+        fields = (
+            "id", "topic", "topic_title", "proposed_by_detail", "students",
+            "students_detail", "assigned_by", "assigned_at", "note",
+        )
         read_only_fields = ("assigned_by", "assigned_at")
+
+
+class TechnologySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Technology
+        fields = ("id", "name", "category", "description", "created_at")
+        read_only_fields = ("id", "created_at")
+
+
+class TopicTechnologySerializer(serializers.ModelSerializer):
+    technology_detail = TechnologySerializer(source="technology", read_only=True)
+
+    class Meta:
+        model = TopicTechnology
+        fields = ("id", "topic", "technology", "technology_detail", "is_primary", "created_at")
+        read_only_fields = ("id", "created_at")
+
+
+class TopicFunctionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TopicFunction
+        fields = ("id", "topic", "function_name", "description", "created_at")
+        read_only_fields = ("id", "created_at")
+
+
+class TopicDocumentSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TopicDocument
+        fields = (
+            "id", "topic", "file", "file_name", "file_type", "file_size",
+            "file_url", "uploaded_by", "uploaded_at",
+        )
+        read_only_fields = ("id", "file_name", "file_type", "file_size", "uploaded_by", "uploaded_at")
+
+    def validate_file(self, uploaded_file):
+        suffix = uploaded_file.name.rsplit(".", 1)[-1].lower() if "." in uploaded_file.name else ""
+        if suffix not in {"pdf", "docx"}:
+            raise serializers.ValidationError("Chỉ hỗ trợ tệp PDF hoặc DOCX.")
+        if uploaded_file.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("Tệp vượt quá giới hạn 10 MB.")
+        return uploaded_file
+
+    def create(self, validated_data):
+        uploaded_file = validated_data["file"]
+        validated_data["file_name"] = uploaded_file.name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+        validated_data["file_type"] = uploaded_file.name.rsplit(".", 1)[-1].upper()
+        validated_data["file_size"] = uploaded_file.size
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        uploaded_file = validated_data.get("file")
+        old_file = instance.file if uploaded_file else None
+        if uploaded_file:
+            validated_data["file_name"] = uploaded_file.name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+            validated_data["file_type"] = uploaded_file.name.rsplit(".", 1)[-1].upper()
+            validated_data["file_size"] = uploaded_file.size
+        instance = super().update(instance, validated_data)
+        if old_file and old_file.name != instance.file.name:
+            old_file.delete(save=False)
+        return instance
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return None
+        request = self.context.get("request")
+        url = reverse("topic-document-download", kwargs={"pk": obj.pk}, request=request)
+        return url
 
 
 class ReviewActionSerializer(serializers.Serializer):
@@ -92,3 +177,17 @@ class ReviewActionSerializer(serializers.Serializer):
 class AssignTopicSerializer(serializers.Serializer):
     student_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
     note = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class SimilarityCheckRequestSerializer(serializers.Serializer):
+    description = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
+    title = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+    source_topic_id = serializers.IntegerField(required=False)
+    top_k = serializers.IntegerField(min_value=1, max_value=100, default=10)
+
+    def validate(self, attrs):
+        if not attrs.get("title", "").strip() and not attrs.get("source_topic_id"):
+            raise serializers.ValidationError({
+                "title": "Nhập tên đề tài hoặc chọn một đề tài trong hệ thống."
+            })
+        return attrs

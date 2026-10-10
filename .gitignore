@@ -1,5 +1,5 @@
 # ============ QUAN TRỌNG — KHÔNG BAO GIỜ COMMIT FILE .env ============
-# File .env chứa mật khẩu DB, SECRET_KEY, GROQ_API_KEY... Nếu lỡ commit rồi push lên Git,
+# File .env chứa mật khẩu DB, SECRET_KEY và cấu hình dịch vụ... Nếu lỡ commit rồi push lên Git,
 # phải coi như các key/mật khẩu đó đã bị lộ — cần đổi lại toàn bộ (rotate) ngay cả sau khi xóa khỏi Git,
 # vì lịch sử commit cũ vẫn còn lưu giá trị đó.
 .env

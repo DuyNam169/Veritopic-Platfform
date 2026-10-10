@@ -16,7 +16,6 @@ import ApprovalPage from "@/features/approval/pages/ApprovalPage";
 import StatisticsPage from "@/features/statistics/pages/StatisticsPage";
 import TopicDetailPage from "@/features/topics/pages/TopicDetailPage";
 import TopicListPage from "@/features/topics/pages/TopicListPage";
-
 // Teacher pages
 import { TeacherDashboardPage } from "@/features/teacher/pages/TeacherDashboardPage";
 import { ProposeTopicPage } from "@/features/teacher/pages/ProposeTopicPage";
@@ -25,6 +24,10 @@ import { EditResubmitPage } from "@/features/teacher/pages/EditResubmitPage";
 import { MyStudentsPage } from "@/features/teacher/pages/MyStudentsPage";
 import { ProgressListPage } from "@/features/teacher/pages/ProgressListPage";
 import { ProgressDetailPage } from "@/features/teacher/pages/ProgressDetailPage";
+
+import PeopleDirectoryPage from "@/features/people/pages/PeopleDirectoryPage";
+import SimilarityCheckPage from "@/features/topics/pages/SimilarityCheckPage";
+import TechnologiesPage from "@/features/academics/pages/TechnologiesPage";
 
 /**
  * Route quản lý riêng (Duyệt đề tài, Danh mục hệ thống) được tách nhóm bằng RoleGuard,
@@ -44,15 +47,23 @@ export const router = createBrowserRouter([
           { path: "/", element: <HomeRedirect /> },
           { path: "/topics", element: <TopicListPage /> },
           { path: "/topics/:id", element: <TopicDetailPage /> },
+          {
+            element: <RoleGuard allow={["admin", "department_head", "teacher"]} />,
+            children: [{ path: "/topics/similarity", element: <SimilarityCheckPage /> }],
+          },
           { path: "/profile", element: <ProfilePage /> },
           {
             element: <RoleGuard allow={["admin", "department_head"]} />,
-            children: [{ path: "/approval", element: <ApprovalPage /> }],
+            children: [
+              { path: "/approval", element: <ApprovalPage /> },
+              { path: "/people", element: <PeopleDirectoryPage /> },
+            ],
           },
           {
             element: <RoleGuard allow={["admin"]} />,
             children: [
               { path: "/academics", element: <AcademicsPage /> },
+              { path: "/technologies", element: <TechnologiesPage /> },
               { path: "/statistics", element: <StatisticsPage /> },
             ],
           },
