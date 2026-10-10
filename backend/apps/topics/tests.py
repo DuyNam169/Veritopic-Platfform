@@ -287,9 +287,8 @@ class AdminTopicManagementTests(APITestCase):
             "Tên đang quá chung chung.",
         )
 
-    @patch("apps.topics.services.workflow.get_embedding", return_value=[0.1] * 768)
     @patch("apps.topics.services.workflow.find_similar_topics")
-    def test_only_admin_can_refresh_and_persist_similarity_at_any_status(self, find_mock, _embedding_mock):
+    def test_only_admin_can_refresh_and_persist_similarity_at_any_status(self, find_mock):
         similar_topic = Topic.objects.create(
             title="Đề tài đối chiếu mới",
             department=self.department,

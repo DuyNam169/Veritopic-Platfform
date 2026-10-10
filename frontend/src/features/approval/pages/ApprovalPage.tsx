@@ -6,12 +6,9 @@ import { Clock } from "@/shared/components/icons";
 import { Button, EmptyState, ErrorState, PageHeader, PageSkeleton, fieldClass } from "@/shared/components/ui";
 import { toast } from "@/shared/lib/toast";
 import { useStoredSimilarityResults } from "@/features/topics/hooks";
+import { StoredSimilarityList } from "@/features/topics/components/StoredSimilarityList";
 import type { Topic } from "@/features/topics/types";
 import { useApproveTopic, usePendingTopics, useRejectTopic, useRequestRenameTopic } from "../hooks";
-
-const warningLabels: Record<string, string> = {
-  normal: "Bình thường", review: "Cần xem xét", high: "Tương đồng cao", duplicate: "Có khả năng trùng",
-};
 
 function errorMessage(error: unknown) {
   if (axios.isAxiosError<Record<string, string | string[]>>(error)) {
@@ -60,7 +57,7 @@ export default function ApprovalPage() {
       <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">{selected.description || "Chưa có mô tả."}</p>
       <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600"><span className="rounded bg-slate-100 px-2 py-1">{selected.department_name}</span><span className="rounded bg-slate-100 px-2 py-1">{selected.field_name || "Chưa phân loại"}</span><span className="rounded bg-slate-100 px-2 py-1">{selected.academic_year_name} · {selected.semester_name}</span></div>
       <Link to={`/topics/${selected.id}`} className="mt-3 inline-block text-sm font-semibold text-blue-700 hover:underline">Mở trang chi tiết đầy đủ →</Link>
-      <section className="mt-6 rounded-xl border border-slate-200 p-4"><h3 className="font-semibold text-slate-900">Kết quả tương đồng đã lưu</h3>{similarities.isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải kết quả...</p> : similarities.isError ? <p className="mt-3 text-sm text-rose-700">Không tải được kết quả tương đồng.</p> : similarities.data?.length ? <div className="mt-3 space-y-2">{similarities.data.map((result) => <div key={result.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-3 text-sm"><Link to={`/topics/${result.similar_topic}`} className="font-medium text-blue-700 hover:underline">{result.similar_topic_title}</Link><span className="font-semibold text-slate-700">{result.similarity_percent.toFixed(1)}% · {warningLabels[result.warning_level] || result.warning_level}</span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">Chưa phát hiện đề tài tương đồng.</p>}</section>
+      <section className="mt-6 rounded-xl border border-slate-200 p-4"><h3 className="font-semibold text-slate-900">Kết quả tương đồng đã lưu</h3>{similarities.isLoading ? <p className="mt-3 text-sm text-slate-500">Đang tải kết quả...</p> : similarities.isError ? <p className="mt-3 text-sm text-rose-700">Không tải được kết quả tương đồng.</p> : <StoredSimilarityList results={similarities.data ?? []} />}</section>
       <label className="mt-5 block text-sm font-medium text-slate-800">Ghi chú xử lý (không bắt buộc)<textarea disabled={isProcessing} rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Nhập lý do hoặc hướng dẫn cho giảng viên..." className={fieldClass} /></label>
       <div className="mt-6 grid gap-2 sm:grid-cols-3"><Button variant="primary" busy={approve.isPending} disabled={isProcessing} onClick={() => decide("approve")}>Duyệt đề tài</Button><Button variant="warning" busy={requestRename.isPending} disabled={isProcessing} onClick={() => decide("rename")}>Yêu cầu sửa tên</Button><Button variant="danger" busy={reject.isPending} disabled={isProcessing} onClick={() => decide("reject")}>Từ chối</Button></div>
     </div></div>}

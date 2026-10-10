@@ -122,7 +122,7 @@ class TopicViewSet(viewsets.ModelViewSet):
 
             raise PermissionDenied("Chỉ Giảng viên mới được đề xuất đề tài mới.")
         topic = serializer.save()
-        # Ngay sau khi tạo: kiểm tra trùng tên chính xác + tính embedding + xếp hạng tương đồng
+        # Ngay sau khi tạo: kiểm tra trùng tên, lọc TF-IDF và chấm tương đồng ngữ nghĩa
         self._propose_result = propose_topic(topic, actor=self.request.user)
 
     def create(self, request, *args, **kwargs):

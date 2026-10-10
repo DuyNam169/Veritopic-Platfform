@@ -3,15 +3,12 @@ from django.db import transaction
 
 from apps.topics.models import Topic, TopicHistory, TopicSimilarityResult
 
-from .similarity import find_similar_topics, get_embedding, is_exact_duplicate, normalize_text
+from .similarity import find_similar_topics, is_exact_duplicate, normalize_text
 
 
 @transaction.atomic
 def refresh_similarity_results(topic: Topic):
-    """Recompute the topic vector and replace its persisted similarity snapshot."""
-    topic.embedding = get_embedding(f"{topic.title}\n{topic.description}")
-    topic.save(update_fields=["embedding"])
-
+    """Tính lại kết quả trên toàn bộ ngân hàng đề tài và thay thế snapshot đã lưu."""
     results = find_similar_topics(topic)
     existing_titles = list(Topic.objects.exclude(pk=topic.pk).values_list("title", flat=True))
     exact_duplicate = is_exact_duplicate(topic.title, existing_titles)
@@ -44,9 +41,8 @@ def propose_topic(topic: Topic, actor):
     Được gọi ngay sau khi Giảng viên tạo đề tài mới. Chạy đủ 2 bước kiểm tra (theo đúng
     Chương 2, mục 2.1.5):
       Bước 1 — kiểm tra trùng tên chính xác (so khớp chuỗi, không cần AI).
-      Bước 2 — tính embedding + xếp hạng tương đồng ngữ nghĩa qua pgvector.
-    (Bước lọc TF-IDF trong similarity.py là hàm tối ưu tùy chọn, không bắt buộc trong pipeline
-    vì pgvector đã tự làm truy vấn lân cận gần nhất hiệu quả — xem ghi chú trong similarity.py)
+      Bước 2 — TF-IDF lọc ứng viên trên toàn bộ ngân hàng đề tài.
+      Bước 3 — mô hình ngôn ngữ chấm ngữ nghĩa và kết hợp với điểm từ vựng.
     """
     refresh_result = refresh_similarity_results(topic)
     exact_duplicate = refresh_result["exact_duplicate"]
