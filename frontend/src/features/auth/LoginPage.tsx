@@ -33,14 +33,16 @@ export default function LoginPage() {
       {/* LEFT HERO PANEL (DESKTOP) */}
       <section
         className="relative hidden overflow-hidden bg-brand-700 lg:block"
-        style={{
-          backgroundImage:
-            "url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1800&q=85')",
-          backgroundPosition: "center",
-          backgroundSize: "cover",
-        }}
       >
-        <div className="absolute inset-0 bg-gradient-to-tr from-brand-900/95 via-brand-800/85 to-brand-700/65" />
+        <div
+          className="absolute -inset-1 bg-cover bg-center opacity-55 blur-[1px] scale-[1.01]"
+          style={{
+            backgroundImage:
+              "url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1800&q=85')",
+          }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/95 via-brand-900/88 to-brand-700/72" />
         <div className="relative flex h-full flex-col justify-between p-12 text-white xl:p-16">
           <div className="flex items-center gap-3 text-lg font-bold tracking-tight">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-sm font-bold shadow-lg">
@@ -50,7 +52,7 @@ export default function LoginPage() {
           </div>
 
           <div className="max-w-xl border-l-2 border-brand-400 pl-6 animate-fade-in">
-            <p className="text-xs font-semibold tracking-[0.22em] text-brand-100 uppercase">
+            <p className="text-xs font-semibold tracking-[0.22em] text-amber-300 uppercase">
               Nền tảng quản lý học thuật
             </p>
             <h1 className="mt-4 text-4xl xl:text-5xl font-bold leading-[1.15] tracking-tight">
@@ -58,14 +60,14 @@ export default function LoginPage() {
               <br />
               Minh bạch, tin cậy.
             </h1>
-            <p className="mt-5 max-w-md text-base leading-relaxed text-brand-50">
+            <p className="mt-5 max-w-md text-base leading-relaxed text-sky-100">
               Một hệ sinh thái thống nhất để đề xuất, kiểm tra tương đồng ngữ nghĩa AI, phê duyệt và
               theo dõi đề tài đồ án sinh viên.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs tracking-wider text-brand-100">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-2 text-xs tracking-wider text-sky-100">
+            <ShieldCheck className="w-4 h-4 text-emerald-300" />
             <span>HỆ THỐNG XÁC THỰC PHÂN QUYỀN BẢO MẬT (RBAC)</span>
           </div>
         </div>

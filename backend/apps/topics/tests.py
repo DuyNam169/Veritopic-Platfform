@@ -20,7 +20,6 @@ from .models import (
     TopicHistory,
     TopicSimilarityResult,
     TopicTechnology,
-    TopicTechnology,
 )
 
 
@@ -307,9 +306,8 @@ class AdminTopicManagementTests(APITestCase):
             "Tên đang quá chung chung.",
         )
 
-    @patch("apps.topics.services.workflow.get_embedding", return_value=[0.1] * 768)
     @patch("apps.topics.services.workflow.find_similar_topics")
-    def test_only_admin_can_refresh_and_persist_similarity_at_any_status(self, find_mock, _embedding_mock):
+    def test_only_admin_can_refresh_and_persist_similarity_at_any_status(self, find_mock):
         similar_topic = Topic.objects.create(
             title="Đề tài đối chiếu mới",
             department=self.department,
@@ -324,6 +322,9 @@ class AdminTopicManagementTests(APITestCase):
             "topic": similar_topic,
             "similarity_percent": 73.5,
             "warning_level": "high",
+            "groq_score": 91.0,
+            "groq_explanation": "Cùng bài toán quản lý.",
+            "assessment_status": "completed",
         }]
         url = reverse("topic-refresh-similarity", kwargs={"pk": self.topic.pk})
 
@@ -336,6 +337,9 @@ class AdminTopicManagementTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[0]["similar_topic"], similar_topic.pk)
         self.assertEqual(response.data[0]["similarity_percent"], 73.5)
+        self.assertEqual(response.data[0]["groq_score"], 91.0)
+        self.assertEqual(response.data[0]["assessment_status"], "completed")
+        self.assertEqual(self.topic.similarity_results.get().groq_explanation, "Cùng bài toán quản lý.")
         audit = self.topic.history.get(action=TopicHistory.Action.SIMILARITY_REFRESHED)
         self.assertEqual(audit.actor, self.admin)
 
@@ -457,6 +461,7 @@ class TopicResourceAPITests(APITestCase):
             self.assertEqual(downloaded.status_code, status.HTTP_200_OK)
             self.assertEqual(downloaded["Content-Type"], "application/pdf")
             self.assertIn("attachment", downloaded["Content-Disposition"])
+            self.assertEqual(b"".join(downloaded.streaming_content), b"%PDF-1.4 test")
 
     @patch("apps.topics.views.find_title_candidates", return_value=[{
         "title": "Ứng dụng học máy trong quản lý thư viện",
@@ -474,9 +479,7 @@ class TopicResourceAPITests(APITestCase):
         self.assertEqual(response.data["suggested_title"], "Ứng dụng học máy trong quản lý thư viện")
         self.assertEqual(len(response.data["title_candidates"]), 1)
 
-    @patch("apps.topics.views.get_embedding", return_value=[0.1] * 768)
-    @patch("pgvector.django.CosineDistance", return_value=Value(0.2))
-    def test_similarity_check_returns_named_exact_duplicate(self, _distance, _embedding):
+    def test_similarity_check_returns_named_exact_duplicate(self):
         self.topic.embedding = [0.1] * 768
         self.topic.save(update_fields=["embedding"])
         self.client.force_authenticate(self.owner)
@@ -491,6 +494,68 @@ class TopicResourceAPITests(APITestCase):
         self.assertEqual(result["title"], self.topic.title)
         self.assertEqual(result["percent"], 100.0)
         self.assertEqual(result["warning_level"], "duplicate")
+
+    @patch("apps.topics.views.find_similar_topics", return_value=[])
+    def test_custom_source_title_does_not_overwrite_source_embedding(self, finder):
+        self.topic.embedding = [0.1] * 768
+        self.topic.save(update_fields=["embedding"])
+        self.client.force_authenticate(self.owner)
+        response = self.client.post(reverse("similarity-check-check"), {
+            "source_topic_id": self.topic.pk, "title": "Một tên hoàn toàn mới", "top_k": 5,
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        query = finder.call_args.args[0]
+        self.assertIsNone(query.pk)
+        self.assertIsNone(query.embedding)
+        self.assertEqual(finder.call_args.kwargs["exclude_topic_id"], self.topic.pk)
+        self.topic.refresh_from_db()
+        self.assertAlmostEqual(float(self.topic.embedding[0]), 0.1)
+
+    @patch("apps.topics.views.find_similar_topics", return_value=[])
+    def test_title_check_passes_optional_description_to_shared_pipeline(self, finder):
+        self.client.force_authenticate(self.owner)
+        response = self.client.post(reverse("similarity-check-check"), {
+            "title": "Đề tài thử", "description": "Mục tiêu và công nghệ",
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(finder.call_args.args[0].description, "Mục tiêu và công nghệ")
+
+    def test_postgres_hybrid_query_and_snapshot_preserve_separate_scores_and_rank(self):
+        from django.db import connection
+        from .services.similarity import SemanticScores
+        if connection.vendor != "postgresql":
+            self.skipTest("Requires real pgvector cosine queries")
+        vector = [1.0] + [0.0] * 767
+        self.topic.embedding = vector
+        self.topic.save(update_fields=["embedding"])
+        related = Topic.objects.create(
+            title="Ngân hàng đề tài bằng học máy", description="Quản lý đề tài",
+            department=self.topic.department, cohort=self.topic.cohort,
+            academic_year=self.topic.academic_year, semester=self.topic.semester,
+            proposed_by=self.owner, embedding=[0.8, 0.6] + [0.0] * 766,
+        )
+        scores = SemanticScores()
+        scores.update({self.topic.id: 10.0, related.id: 90.0})
+        scores.explanations = {related.id: "Cùng mục tiêu quản lý."}
+        self.client.force_authenticate(self.owner)
+        with override_settings(SIMILARITY_GROQ_ENABLED=True), \
+                patch("apps.topics.services.similarity.get_embedding", return_value=vector), \
+                patch("apps.topics.services.similarity.score_candidates_semantically", return_value=scores):
+            response = self.client.post(reverse("similarity-check-check"), {
+                "title": "Quản lý đề tài nghiên cứu", "description": "Dùng học máy", "top_k": 2,
+            })
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+            self.assertEqual(response.data["results"][0]["topic_id"], related.id)
+            self.assertAlmostEqual(response.data["results"][0]["percent"], 80.0)
+            self.assertEqual(response.data["results"][0]["groq_score"], 90.0)
+            self.client.force_authenticate(self.admin)
+            refresh = self.client.post(reverse("topic-refresh-similarity", kwargs={"pk": self.topic.id}))
+            self.assertEqual(refresh.status_code, status.HTTP_200_OK, refresh.data)
+            snapshot = self.topic.similarity_results.get()
+            self.assertAlmostEqual(snapshot.similarity_percent, 80.0)
+            self.assertEqual(snapshot.groq_score, 90.0)
+            self.assertEqual(snapshot.rank, 1)
+            self.assertEqual(snapshot.groq_explanation, "Cùng mục tiêu quản lý.")
 
 
 class PhoBERTEmbeddingTests(SimpleTestCase):

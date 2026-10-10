@@ -147,8 +147,15 @@ CORS_ALLOW_CREDENTIALS = True
 PHOBERT_API_URL = env("PHOBERT_API_URL", default="http://127.0.0.1:8001").rstrip("/")
 PHOBERT_API_TIMEOUT = env.int("PHOBERT_API_TIMEOUT", default=60)
 
+# ===== Groq API (đọc từ biến môi trường, KHÔNG hard-code) =====
+SIMILARITY_GROQ_ENABLED = env.bool("SIMILARITY_GROQ_ENABLED", default=False)
+GROQ_API_KEY = env("GROQ_API_KEY", default="")
+GROQ_SIMILARITY_MODEL = env("GROQ_SIMILARITY_MODEL", default="qwen/qwen3.8-27b")
+
 # ===== Ngưỡng cảnh báo tương đồng đề tài (%) — có thể chỉnh qua .env mà không cần sửa code =====
 SIMILARITY_THRESHOLD_REVIEW = env.float("SIMILARITY_THRESHOLD_REVIEW", default=50.0)
 SIMILARITY_THRESHOLD_HIGH = env.float("SIMILARITY_THRESHOLD_HIGH", default=70.0)
 SIMILARITY_THRESHOLD_DUPLICATE = env.float("SIMILARITY_THRESHOLD_DUPLICATE", default=85.0)
 SIMILARITY_TOP_N = env.int("SIMILARITY_TOP_N", default=5)
+SIMILARITY_PREFILTER_TOP_K = env.int("SIMILARITY_PREFILTER_TOP_K", default=20)
+SIMILARITY_MIN_DISPLAY = env.float("SIMILARITY_MIN_DISPLAY", default=20.0)

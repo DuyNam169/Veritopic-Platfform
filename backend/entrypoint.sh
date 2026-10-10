@@ -1,4 +1,3 @@
-```sh
 #!/bin/sh
 
 set -e
@@ -27,4 +26,3 @@ elif [ "$1" = "gunicorn" ]; then
 else
     exec "$@"
 fi
-```

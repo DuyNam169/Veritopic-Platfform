@@ -37,6 +37,9 @@ export interface TopicDocument {
 }
 
 export interface SimilarityCheckResult {
+  groq_score?: number | null;
+  groq_explanation?: string;
+  assessment_status?: string;
   topic_id: number;
   title: string;
   percent: number;
@@ -100,7 +103,7 @@ export const topicResourcesApi = {
     link.click();
     URL.revokeObjectURL(url);
   },
-  checkSimilarity: (payload: { title?: string; source_topic_id?: number; top_k?: number }) =>
+  checkSimilarity: (payload: { description?: string; title?: string; source_topic_id?: number; top_k?: number }) =>
     api.post<{ query: string; count: number; results: SimilarityCheckResult[] }>(
       "/topics/similarity/checks/check/",
       payload,

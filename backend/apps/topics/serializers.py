@@ -69,7 +69,7 @@ class TopicSimilarityResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TopicSimilarityResult
-        fields = ("id", "similar_topic", "similar_topic_title", "similarity_percent", "warning_level", "created_at")
+        fields = ("id", "similar_topic", "similar_topic_title", "similarity_percent", "warning_level", "groq_score", "groq_explanation", "assessment_status", "created_at")
 
 
 class TopicHistorySerializer(serializers.ModelSerializer):
@@ -180,6 +180,7 @@ class AssignTopicSerializer(serializers.Serializer):
 
 
 class SimilarityCheckRequestSerializer(serializers.Serializer):
+    description = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     title = serializers.CharField(max_length=1000, required=False, allow_blank=True)
     source_topic_id = serializers.IntegerField(required=False)
     top_k = serializers.IntegerField(min_value=1, max_value=100, default=10)

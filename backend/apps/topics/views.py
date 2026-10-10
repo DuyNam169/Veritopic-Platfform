@@ -33,13 +33,7 @@ from .serializers import (
     SimilarityCheckRequestSerializer,
 )
 from .services.document_extraction import FileExtractionError, extract_document_text, find_title_candidates
-from .services.similarity import (
-    classify_warning_level,
-    find_similar_topics,
-    get_embedding,
-    is_exact_duplicate,
-    normalize_text,
-)
+from .services.similarity import find_similar_topics
 from .services.workflow import assign_topic, propose_topic, refresh_similarity_results
 
 
@@ -146,7 +140,7 @@ class TopicViewSet(viewsets.ModelViewSet):
 
             raise PermissionDenied("Chỉ Giảng viên mới được đề xuất đề tài mới.")
         topic = serializer.save()
-        # Ngay sau khi tạo: kiểm tra trùng tên chính xác + tính embedding + xếp hạng tương đồng
+        # Kiểm tra trùng tên, PhoBERT + TF-IDF; Groq tùy chọn đánh giá bổ sung
         self._propose_result = propose_topic(topic, actor=self.request.user)
 
     def create(self, request, *args, **kwargs):
@@ -158,6 +152,9 @@ class TopicViewSet(viewsets.ModelViewSet):
             {
                 "topic_id": r["topic"].id,
                 "topic_title": r["topic"].title,
+                "groq_score": r.get("groq_score"),
+                "groq_explanation": r.get("groq_explanation", ""),
+                "assessment_status": r.get("assessment_status", "disabled"),
                 "similarity_percent": r["similarity_percent"],
                 "warning_level": r["warning_level"],
             }
@@ -177,6 +174,9 @@ class TopicViewSet(viewsets.ModelViewSet):
         data = [
             {
                 "topic": TopicSerializer(r["topic"]).data,
+                "groq_score": r.get("groq_score"),
+                "groq_explanation": r.get("groq_explanation", ""),
+                "assessment_status": r.get("assessment_status", "disabled"),
                 "similarity_percent": r["similarity_percent"],
                 "warning_level": r["warning_level"],
             }
@@ -359,40 +359,30 @@ class SimilarityCheckViewSet(viewsets.GenericViewSet):
             if not title:
                 title = source_topic.title
 
-        candidates = Topic.objects.filter(embedding__isnull=False)
+        # Share the same pipeline with proposal and stored-result refresh.
         if source_topic_id:
-            candidates = candidates.exclude(pk=source_topic_id)
-        existing_titles = list(candidates.values_list("title", flat=True))
-        if not existing_titles:
-            return Response({"query": title, "count": 0, "results": []})
-
-        from pgvector.django import CosineDistance
-
-        embedding = get_embedding(title)
-        exact_duplicate = is_exact_duplicate(title, existing_titles)
-        ranked = (
-            candidates.select_related(
-                "proposed_by", "department", "field", "cohort", "academic_year", "semester"
-            )
-            .annotate(distance=CosineDistance("embedding", embedding))
-            .order_by("distance")[:data["top_k"]]
-        )
+            query_topic = source_topic
+            title_changed = query_topic.title != title
+            query_topic.title = title
+            if title_changed:
+                # A custom title is a transient query; never overwrite the stored source vector.
+                query_topic.embedding = None
+                query_topic.pk = None
+        else:
+            query_topic = Topic(title=title, description=data.get("description", ""))
+        matches = find_similar_topics(query_topic, top_n=data["top_k"], exclude_topic_id=source_topic_id)
         results = []
-        for topic in ranked:
-            percent = round(max(0.0, min(100.0, (1 - topic.distance) * 100)), 2)
-            exact_match = exact_duplicate and normalize_text(topic.title) == normalize_text(title)
-            if exact_match:
-                percent = 100.0
-            level = "duplicate" if exact_match else classify_warning_level(percent)
+        for result in matches:
+            topic = result["topic"]
+            percent = result["similarity_percent"]
+            level = result["warning_level"]
             results.append({
-                "topic_id": topic.pk,
-                "title": topic.title,
-                "topic_title": topic.title,
-                "similarity": percent / 100,
-                "percent": percent,
-                "similarity_percent": percent,
-                "warning": level,
-                "warning_level": level,
+                "topic_id": topic.pk, "title": topic.title, "topic_title": topic.title,
+                "similarity": percent / 100, "percent": percent,
+                "similarity_percent": percent, "warning": level, "warning_level": level,
+                "groq_score": result["groq_score"],
+                "groq_explanation": result["groq_explanation"],
+                "assessment_status": result["assessment_status"],
             })
         return Response({"query": title, "count": len(results), "results": results})
 

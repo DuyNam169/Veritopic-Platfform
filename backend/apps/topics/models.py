@@ -128,10 +128,19 @@ class TopicSimilarityResult(models.Model):
             ("duplicate", "Có khả năng trùng đề tài"),
         ],
     )
+    groq_score = models.FloatField(null=True, blank=True)
+    groq_explanation = models.TextField(blank=True)
+    assessment_status = models.CharField(max_length=20, default="disabled", choices=[
+        ("disabled", "Chưa bật đánh giá bổ sung"),
+        ("completed", "Đã đánh giá bổ sung"),
+        ("unavailable", "Đánh giá bổ sung tạm thời không khả dụng"),
+        ("exact_match", "Trùng tên chính xác"),
+    ])
+    rank = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-similarity_percent"]
+        ordering = ["rank", "-similarity_percent"]
 
 
 class TopicDeletionAudit(models.Model):

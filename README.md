@@ -24,6 +24,8 @@ và chính xác hơn.
 - Trích xuất gợi ý tiêu đề từ tài liệu PDF/DOCX (PDF scan cần OCR hiện chưa được hỗ trợ)
 - Tính mức độ tương đồng ngữ nghĩa giữa các tiêu đề đề tài bằng embedding PhoBERT service riêng,
   lưu trữ bằng PostgreSQL + pgvector
+- Gộp ứng viên từ PhoBERT và TF-IDF từ/ký tự theo thứ hạng để giảm bỏ sót
+- Groq tùy chọn đánh giá nội dung, giải thích và xếp lại kết quả; giữ riêng hai điểm
 - Hiển thị Top đề tài tương đồng nhất kèm tỉ lệ %
 - Cảnh báo theo ngưỡng:
 
@@ -58,7 +60,7 @@ trang này được lưu với mật khẩu không thể đăng nhập. Việc g
 | Frontend | TypeScript + React + Vite + Tailwind CSS |
 | Backend | Django + Django REST Framework (RESTful API) |
 | Database | PostgreSQL + pgvector |
-| AI | PhoBERT service riêng (embedding 768 chiều qua HTTP API) |
+| AI | PhoBERT service riêng (embedding 768 chiều qua HTTP API); Groq bổ sung tùy chọn |
 | Trích xuất tài liệu | pypdf (PDF) + thư viện chuẩn Python (DOCX) |
 | Đóng gói / triển khai | Docker + Docker Compose |
 | Auth | JWT (`djangorestframework-simplejwt`) |
@@ -169,6 +171,26 @@ Mở `backend/.env` và điền các giá trị thật:
 - `POSTGRES_PASSWORD`: đặt mật khẩu riêng, không dùng giá trị mẫu
 - `PHOBERT_API_URL`: địa chỉ AI service. Khi chạy bằng Compose, `backend` tự kết nối tới service `ai` ở `http://ai:8001`; khi chạy Django trực tiếp trên máy host, đặt thành `http://127.0.0.1:8001`.
 - `PHOBERT_API_TIMEOUT`: timeout gọi model (mặc định 60 giây để tính đến lần khởi động model đầu tiên).
+- `SIMILARITY_GROQ_ENABLED=False` (mặc định): dùng PhoBERT và TF-IDF. Đặt `True` và cấu hình
+  `GROQ_API_KEY`, `GROQ_SIMILARITY_MODEL` để bật đánh giá nội dung bổ sung. Không cần key khi tắt.
+- `SIMILARITY_PREFILTER_TOP_K` (mặc định 20): số ứng viên gộp từ hai danh sách gửi sang bước đánh giá.
+  `SIMILARITY_MIN_DISPLAY` (mặc định 20) lọc kết quả thấp ở cả hai điểm.
+
+API kiểm tra theo tên, tạo đề tài và chạy lại kết quả dùng chung pipeline. Tên trùng sau chuẩn hóa
+luôn được ưu tiên với 100%; không cần AI khi toàn bộ ứng viên đều trùng tên. Ứng viên TF-IDF chưa
+có vector sẽ được mã hóa và lưu; vẫn nên chạy `rebuild_phobert_embeddings` để toàn bộ ngân hàng
+được tìm bằng vector. Khi Groq lỗi/timeout, API giữ điểm và thứ tự PhoBERT, đánh dấu
+`assessment_status=unavailable`; giao diện ghi rõ trạng thái. Khi Groq thành công, kết quả được
+xếp lại theo điểm bổ sung nhưng phần trăm và mức cảnh báo vẫn dựa trên PhoBERT. Hai điểm chưa
+được hiệu chuẩn thành xác suất trùng đề tài.
+
+Migration `topics.0007` lưu điểm, giải thích, trạng thái và thứ tự kết quả để người duyệt xem lại
+cùng một snapshot. Sau khi cập nhật code, chạy `python manage.py migrate` (Compose tự chạy khi
+khởi động). Kết quả cũ vẫn đọc được; chạy lại kiểm tra để có dữ liệu bổ sung.
+
+Trước khi bật Groq rộng rãi, đánh giá PhoBERT, Groq và bản kết hợp trên cùng tập đề tài có nhãn
+chuyên môn: đo số đề tài trùng bị bỏ sót, cảnh báo nhầm và thời gian phản hồi. Kiểm thử phần mềm
+không chứng minh bản kết hợp chính xác hơn trên dữ liệu dự án.
 
 Frontend, backend, PostgreSQL và PhoBERT đều chạy trong Compose. PhoBERT được mở ở
 `http://localhost:8001` để kiểm tra trực tiếp; backend gọi nó qua tên service nội bộ `ai`.
@@ -203,6 +225,17 @@ Nếu cần chạy nền, dùng `docker compose up --build -d`; xem trạng thá
 ```bash
 docker compose exec backend python manage.py createsuperuser
 ```
+
+**Dữ liệu mẫu Khoa CNTT UTT (dành cho phát triển/kiểm thử)**
+```bash
+docker compose exec backend python manage.py seed_utt_demo
+```
+
+Lệnh có thể chạy lại an toàn: dữ liệu mẫu được cập nhật thay vì nhân bản. Bộ dữ liệu gồm 5 bộ môn,
+5 khóa học, 4 năm học, 12 lĩnh vực, tài khoản đủ 4 vai trò, 30 đề tài với nhiều trạng thái, lịch sử
+duyệt và phân công nhóm. Kết quả tương đồng được tạo bằng thuật toán thật khi đề tài được đề xuất hoặc
+Admin bấm “Chạy lại kiểm tra”. Tất cả tên người, email, số điện thoại và mã sinh viên
+đều là dữ liệu giả lập; mật khẩu chung cho các tài khoản demo là `Veritopic@2026`.
 
 ### 4.3. Lệnh thường dùng khi phát triển
 
@@ -271,7 +304,7 @@ git rm --cached backend/.env frontend/.env
    lần sau khi khởi động PhoBERT để lập chỉ mục lại embedding tiêu đề của các đề tài hiện có.
 5. **Mỗi khi sửa `models.py`** trong bất kỳ app nào, phải chạy `makemigrations` rồi `migrate` (xem mục
    4.3), nếu không DB sẽ không khớp với code. Schema công nghệ/chức năng/tài liệu được thêm ở migration
-   `topics.0006_topic_resources`.
+   `topics.0006_topic_resources`; snapshot đánh giá bổ sung ở `topics.0007`.
 6. **Ngưỡng cảnh báo tương đồng (`SIMILARITY_THRESHOLD_*`) đọc từ `.env`**, không hard-code trong code —
    muốn đổi ngưỡng chỉ cần sửa `.env` rồi restart backend, không cần sửa `similarity.py`.
 7. **Route quản lý riêng** (`/api/v1/management/...`) tách hẳn khỏi route nghiệp vụ thông thường — khi
