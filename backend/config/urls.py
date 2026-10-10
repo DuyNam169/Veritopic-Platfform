@@ -22,6 +22,7 @@ urlpatterns = [
     # ---- Nghiệp vụ chính ----
     path("api/v1/academics/", include("apps.academics.urls")),
     path("api/v1/topics/", include("apps.topics.urls")),
+    path("api/v1/progress/", include("apps.progress.urls")),
     path("api/v1/statistics/", include("apps.statistics.urls")),
 
     # ---- Route quản lý riêng (Admin / Trưởng bộ môn) ----
