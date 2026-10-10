@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SupplementaryAssessment } from "./SupplementaryAssessment";
 
 import type { StoredSimilarityResult, WarningLevel } from "../types";
 
@@ -11,7 +12,7 @@ const levelStyles: Record<WarningLevel, { label: string; badge: string }> = {
 
 const summaryStyles: Record<WarningLevel, { title: string; description: string; className: string }> = {
   normal: {
-    title: "Không phát hiện tương đồng đáng kể",
+    title: "Mức tương đồng tên thấp trong các kết quả đang hiển thị",
     description: "Các kết quả bên dưới đều dưới ngưỡng cảnh báo 50% và chỉ dùng để đối chiếu tham khảo.",
     className: "border-emerald-200 bg-emerald-50 text-emerald-800",
   },
@@ -51,9 +52,9 @@ export function StoredSimilarityList({ results }: { results: StoredSimilarityRes
       {results.map((result) => {
         const level = levelStyles[result.warning_level];
         return <div key={result.id} className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-white p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <Link to={`/topics/${result.similar_topic}`} className="font-medium text-blue-700 hover:underline">
+          <div className="min-w-0 flex-1"><Link to={`/topics/${result.similar_topic}`} className="font-medium text-blue-700 hover:underline">
             {result.similar_topic_title}
-          </Link>
+          </Link><SupplementaryAssessment result={result} /></div>
           <div className="flex shrink-0 items-center gap-2">
             <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${level.badge}`}>{level.label}</span>
             <span className="w-14 text-right font-bold tabular-nums text-slate-800">{result.similarity_percent.toFixed(1)}%</span>
@@ -62,7 +63,7 @@ export function StoredSimilarityList({ results }: { results: StoredSimilarityRes
       })}
     </div>
     <p className="mt-3 text-xs leading-5 text-slate-400">
-      Tỷ lệ là điểm hỗ trợ sàng lọc, không thay thế đánh giá chuyên môn của người duyệt.
+      Tỷ lệ phản ánh mức tương đồng tên đề tài. Điểm đánh giá nội dung bổ sung được hiển thị riêng khi có; cả hai hỗ trợ người duyệt đối chiếu và không thay thế quyết định chuyên môn.
     </p>
   </>;
 }

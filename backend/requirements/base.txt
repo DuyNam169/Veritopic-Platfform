@@ -17,3 +17,4 @@ pydyf==0.11.0
 #   "AttributeError: 'super' object has no attribute 'transform'" khi xuất PDF.
 #   Không bỏ dòng pin này / không để pip tự chọn bản pydyf mới nhất.
 Pillow==10.4.0
+pypdf==5.9.0

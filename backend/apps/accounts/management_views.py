@@ -1,11 +1,11 @@
 from django.contrib.auth import get_user_model
-from rest_framework import viewsets, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.common.permissions import IsAdmin
+from apps.common.permissions import IsAdmin, IsAdminOrDepartmentHead
 
-from .serializers import UserManagementSerializer
+from .serializers import PeopleProfileSerializer, UserManagementSerializer
 
 User = get_user_model()
 
@@ -34,3 +34,20 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         user.set_password(password)
         user.save(update_fields=["password"])
         return Response({"detail": "Đặt lại mật khẩu thành công."})
+
+
+class PeopleDirectoryViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Manage academic profiles without issuing a login password."""
+    serializer_class = PeopleProfileSerializer
+    permission_classes = (IsAdminOrDepartmentHead,)
+    queryset = User.objects.filter(role__in=("teacher", "student")).select_related(
+        "department", "cohort"
+    ).order_by("role", "last_name", "first_name", "id")
+    filterset_fields = ("role", "department", "cohort", "is_active")
+    search_fields = ("username", "email", "first_name", "last_name", "student_code")

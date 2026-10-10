@@ -9,20 +9,23 @@ và chính xác hơn.
 **Quản lý danh mục dữ liệu nền**
 - Quản lý khóa / năm học / học kỳ
 - Quản lý giảng viên, sinh viên
+- Tra cứu sinh viên theo đề tài và giảng viên hướng dẫn; tra cứu giảng viên theo sinh viên/đề tài phụ trách
 - Quản lý chuyên ngành / bộ môn
 - Quản lý danh mục lĩnh vực đề tài (Web, Mobile, AI, Nhúng...)
 
 **Quản lý vòng đời đề tài**
 - Quản lý danh mục đề tài; giao đề tài cho sinh viên hoặc nhóm sinh viên
+- Quản lý công nghệ, chức năng chính và tài liệu PDF/DOCX gắn với đề tài
 - Lưu lịch sử đề tài của tất cả các khóa
 - Tìm kiếm đề tài theo tên, từ khóa, giảng viên, sinh viên, khóa, năm học
 
 **Phát hiện trùng lặp / tương đồng (chức năng lõi)**
 - Kiểm tra trùng tên chính xác
-- Kiểm tra đề tài gần giống theo từ khóa (TF-IDF + Cosine Similarity)
-- Lọc ứng viên gần giống trên toàn bộ ngân hàng đề tài bằng TF-IDF từ và ký tự
-- Dùng mô hình ngôn ngữ Groq chấm tương đồng ngữ nghĩa theo rubric cố định, kết hợp với điểm TF-IDF
-  và lưu snapshot kết quả trong PostgreSQL
+- Trích xuất gợi ý tiêu đề từ tài liệu PDF/DOCX (PDF scan cần OCR hiện chưa được hỗ trợ)
+- Tính mức độ tương đồng ngữ nghĩa giữa các tiêu đề đề tài bằng embedding PhoBERT service riêng,
+  lưu trữ bằng PostgreSQL + pgvector
+- Gộp ứng viên từ PhoBERT và TF-IDF từ/ký tự theo thứ hạng để giảm bỏ sót
+- Groq tùy chọn đánh giá nội dung, giải thích và xếp lại kết quả; giữ riêng hai điểm
 - Hiển thị Top đề tài tương đồng nhất kèm tỉ lệ %
 - Cảnh báo theo ngưỡng:
 
@@ -45,6 +48,11 @@ và chính xác hơn.
 - Giảng viên (`teacher`)
 - Sinh viên (`student`)
 
+Hồ sơ giảng viên/sinh viên trong Veritopic dùng tài khoản `User` hiện có theo role. Trang **Giảng viên &
+sinh viên** (`/people`) cho phép Admin/Trưởng bộ môn tra cứu phân công và thêm/sửa hồ sơ; hồ sơ tạo từ
+trang này được lưu với mật khẩu không thể đăng nhập. Việc gán sinh viên/đề tài tiếp tục dùng
+`TopicAssignment`; giảng viên hướng dẫn được lấy từ giảng viên đề xuất đề tài (`proposed_by`).
+
 ## 2. Công nghệ sử dụng
 
 | Thành phần | Công nghệ |
@@ -52,7 +60,8 @@ và chính xác hơn.
 | Frontend | TypeScript + React + Vite + Tailwind CSS |
 | Backend | Django + Django REST Framework (RESTful API) |
 | Database | PostgreSQL + pgvector |
-| AI | Groq API (chấm tương đồng ngữ nghĩa — mặc định `qwen/qwen3.8-27b`) |
+| AI | PhoBERT service riêng (embedding 768 chiều qua HTTP API); Groq bổ sung tùy chọn |
+| Trích xuất tài liệu | pypdf (PDF) + thư viện chuẩn Python (DOCX) |
 | Đóng gói / triển khai | Docker + Docker Compose |
 | Auth | JWT (`djangorestframework-simplejwt`) |
 | Export | openpyxl (Excel), WeasyPrint (PDF) |
@@ -108,6 +117,13 @@ Route nghiệp vụ thông thường (mọi role đã đăng nhập tùy theo pe
 /api/v1/topics/topics/{id}/history/            GET  — lịch sử thao tác đề tài
 /api/v1/topics/topics/{id}/assign/             POST — giao đề tài cho sinh viên/nhóm
 /api/v1/topics/assignments/            GET   — tra cứu lượt giao đề tài
+/api/v1/topics/technologies/          CRUD  — danh mục công nghệ (chỉ Admin được ghi)
+/api/v1/topics/topic-technologies/    CRUD  — công nghệ của đề tài
+/api/v1/topics/topic-functions/       CRUD  — chức năng chính của đề tài
+/api/v1/topics/topic-documents/       CRUD  — tài liệu PDF/DOCX của đề tài
+/api/v1/topics/topic-documents/{id}/download/ GET — tải tài liệu (cần đăng nhập)
+/api/v1/topics/similarity/checks/check/       POST — so khớp tên đề tài với PhoBERT
+/api/v1/topics/similarity/checks/extract-file/ POST — trích xuất tiêu đề từ PDF/DOCX
 
 /api/v1/statistics/overview/           GET   — số liệu thống kê
 /api/v1/statistics/export/?export_format=excel|pdf    GET  — xuất báo cáo
@@ -116,11 +132,17 @@ Route nghiệp vụ thông thường (mọi role đã đăng nhập tùy theo pe
 **Route quản lý riêng** (tách biệt, chỉ Admin/Trưởng bộ môn — xem `apps/common/management_urls.py`):
 ```
 /api/v1/management/users/              CRUD  — quản lý tài khoản (chỉ Admin)
+/api/v1/management/people/             GET/POST/PATCH hồ sơ — Admin/Trưởng bộ môn; hồ sơ tạo mới không có mật khẩu đăng nhập
 /api/v1/management/topics/pending/     GET   — danh sách đề tài chờ duyệt
 /api/v1/management/topics/{id}/approve/        POST — duyệt đề tài
 /api/v1/management/topics/{id}/reject/         POST — từ chối đề tài
 /api/v1/management/topics/{id}/request-rename/ POST — yêu cầu sửa tên đề tài
 ```
+
+Quản lý công nghệ trên giao diện tại `/technologies` (Admin); trang `/topics/similarity` cho
+Admin/Trưởng bộ môn/Giảng viên kiểm tra tiêu đề hoặc trích xuất tiêu đề từ tệp. Trong trang chi tiết
+đề tài, Admin và giảng viên đề xuất có thể quản lý công nghệ, chức năng và tài liệu; các vai trò đã
+đăng nhập khác chỉ xem/tải tài liệu.
 
 API docs (Swagger UI) tự sinh tại: `http://localhost:8000/api/docs/`
 
@@ -129,7 +151,8 @@ API docs (Swagger UI) tự sinh tại: `http://localhost:8000/api/docs/`
 ### 4.1. Yêu cầu
 
 - Docker & Docker Compose đã cài sẵn
-- Tài khoản Groq (miễn phí) để lấy API key: https://console.groq.com/keys
+- Checkpoint PhoBERT `AI_KiemTraTrung_TruongBoMon/models/tier1_best.pt` có sẵn. Checkpoint bị loại khỏi Git vì dung lượng; cần đặt/copy file đã huấn luyện vào đúng đường dẫn trên trước khi khởi chạy.
+- Máy cần Internet lần đầu chạy để tải model gốc `vinai/phobert-base-v2` vào Docker volume cache. Compose dùng CPU cho dịch vụ AI; lần tải model đầu tiên có thể mất vài phút.
 
 ### 4.2. Các bước cài đặt
 
@@ -146,7 +169,33 @@ cp backend/.env.example backend/.env
 Mở `backend/.env` và điền các giá trị thật:
 - `DJANGO_SECRET_KEY`: chuỗi ngẫu nhiên dài (có thể sinh bằng lệnh bên dưới)
 - `POSTGRES_PASSWORD`: đặt mật khẩu riêng, không dùng giá trị mẫu
-- `GROQ_API_KEY`: lấy tại https://console.groq.com/keys
+- `PHOBERT_API_URL`: địa chỉ AI service. Khi chạy bằng Compose, `backend` tự kết nối tới service `ai` ở `http://ai:8001`; khi chạy Django trực tiếp trên máy host, đặt thành `http://127.0.0.1:8001`.
+- `PHOBERT_API_TIMEOUT`: timeout gọi model (mặc định 60 giây để tính đến lần khởi động model đầu tiên).
+- `SIMILARITY_GROQ_ENABLED=False` (mặc định): dùng PhoBERT và TF-IDF. Đặt `True` và cấu hình
+  `GROQ_API_KEY`, `GROQ_SIMILARITY_MODEL` để bật đánh giá nội dung bổ sung. Không cần key khi tắt.
+- `SIMILARITY_PREFILTER_TOP_K` (mặc định 20): số ứng viên gộp từ hai danh sách gửi sang bước đánh giá.
+  `SIMILARITY_MIN_DISPLAY` (mặc định 20) lọc kết quả thấp ở cả hai điểm.
+
+API kiểm tra theo tên, tạo đề tài và chạy lại kết quả dùng chung pipeline. Tên trùng sau chuẩn hóa
+luôn được ưu tiên với 100%; không cần AI khi toàn bộ ứng viên đều trùng tên. Ứng viên TF-IDF chưa
+có vector sẽ được mã hóa và lưu; vẫn nên chạy `rebuild_phobert_embeddings` để toàn bộ ngân hàng
+được tìm bằng vector. Khi Groq lỗi/timeout, API giữ điểm và thứ tự PhoBERT, đánh dấu
+`assessment_status=unavailable`; giao diện ghi rõ trạng thái. Khi Groq thành công, kết quả được
+xếp lại theo điểm bổ sung nhưng phần trăm và mức cảnh báo vẫn dựa trên PhoBERT. Hai điểm chưa
+được hiệu chuẩn thành xác suất trùng đề tài.
+
+Migration `topics.0007` lưu điểm, giải thích, trạng thái và thứ tự kết quả để người duyệt xem lại
+cùng một snapshot. Sau khi cập nhật code, chạy `python manage.py migrate` (Compose tự chạy khi
+khởi động). Kết quả cũ vẫn đọc được; chạy lại kiểm tra để có dữ liệu bổ sung.
+
+Trước khi bật Groq rộng rãi, đánh giá PhoBERT, Groq và bản kết hợp trên cùng tập đề tài có nhãn
+chuyên môn: đo số đề tài trùng bị bỏ sót, cảnh báo nhầm và thời gian phản hồi. Kiểm thử phần mềm
+không chứng minh bản kết hợp chính xác hơn trên dữ liệu dự án.
+
+Frontend, backend, PostgreSQL và PhoBERT đều chạy trong Compose. PhoBERT được mở ở
+`http://localhost:8001` để kiểm tra trực tiếp; backend gọi nó qua tên service nội bộ `ai`.
+Model Hugging Face được cache trong volume `huggingface_cache`; checkpoint riêng được mount chỉ đọc,
+không đóng gói vào image.
 
 Sinh `SECRET_KEY` ngẫu nhiên:
 ```bash
@@ -163,7 +212,9 @@ Giữ nguyên `VITE_API_BASE_URL=http://localhost:8000/api/v1` nếu chạy loca
 ```bash
 docker compose up --build
 ```
-Lần đầu chạy sẽ tự động: build image, chờ Postgres sẵn sàng, cài extension `vector`, chạy migrate.
+Lần đầu chạy sẽ build cả bốn dịch vụ, tải PhoBERT về cache, chờ PostgreSQL sẵn sàng và tự chạy migrate.
+Nếu cần chạy nền, dùng `docker compose up --build -d`; xem trạng thái bằng `docker compose ps` và log bằng
+`docker compose logs -f ai backend frontend`.
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000/api/v1/
@@ -201,6 +252,9 @@ docker compose exec backend python manage.py migrate
 # Vào shell Django
 docker compose exec backend python manage.py shell
 
+# Tính lại toàn bộ vector PhoBERT (cần AI service đang chạy)
+docker compose exec backend python manage.py rebuild_phobert_embeddings --batch-size 32
+
 # Cài thêm package Python mới -> nhớ thêm vào requirements/base.txt (hoặc dev.txt) rồi build lại
 docker compose up --build backend
 
@@ -214,7 +268,7 @@ Dự án này đã cấu hình sẵn để **không có thông tin nhạy cảm 
 
 1. **`.env` bị chặn hoàn toàn** bởi `.gitignore` (gốc dự án) — chỉ có `.env.example` (không chứa giá trị
    thật, chỉ có tên biến) mới được commit.
-2. Toàn bộ mật khẩu DB, `SECRET_KEY`, `GROQ_API_KEY` chỉ được đọc qua biến môi trường trong
+2. Toàn bộ mật khẩu DB và `SECRET_KEY` chỉ được đọc qua biến môi trường trong
    `config/settings/base.py` (dùng `django-environ`) — **không có giá trị thật nào hard-code trong code**.
 3. `docker-compose.yml` chỉ tham chiếu `env_file: ./backend/.env` — bản thân file compose không chứa
    giá trị nhạy cảm nào, an toàn để commit.
@@ -232,8 +286,8 @@ git rm --cached backend/.env frontend/.env
 
 **Nếu lỡ đã commit và push `.env` lên Git rồi:**
 - Xóa file khỏi commit mới nhất là *không đủ* — lịch sử commit cũ vẫn còn lưu giá trị thật.
-- Phải **đổi lại (rotate) toàn bộ key/mật khẩu đã lộ**: đổi `GROQ_API_KEY` mới trên console Groq, đổi
-  `POSTGRES_PASSWORD`, sinh lại `DJANGO_SECRET_KEY` mới.
+- Phải **đổi lại (rotate) toàn bộ key/mật khẩu đã lộ**: đổi `POSTGRES_PASSWORD`, sinh lại
+  `DJANGO_SECRET_KEY` mới và kiểm tra lại các thông tin xác thực dịch vụ bên ngoài.
 - Nếu cần xóa hẳn khỏi lịch sử Git, dùng `git filter-repo` hoặc BFG Repo-Cleaner — nhưng ưu tiên rotate
   key trước, đó là bước quan trọng nhất.
 
@@ -242,33 +296,35 @@ git rm --cached backend/.env frontend/.env
 1. **Không viết logic nghiệp vụ trong `views.py`.** Toàn bộ logic tính similarity, logic duyệt/từ chối
    đề tài đã được tách vào `apps/topics/services/`. Khi thêm chức năng mới, viết vào `services/`, view
    chỉ gọi service rồi trả response — giữ view mỏng, dễ test.
-2. **`GROQ_API_KEY` bắt buộc phải có** trong `backend/.env` thì chức năng tạo đề tài mới (tự động chạy
-   kiểm tra tương đồng) mới hoạt động. Nếu chưa có key, `apps/topics/services/similarity.py` sẽ raise lỗi
-   rõ ràng thay vì lỗi khó hiểu.
-3. **Groq free tier có giới hạn rate limit.** Mỗi lần tạo đề tài hoặc bấm chạy lại sẽ có một yêu cầu
-   chấm ngữ nghĩa cho nhóm ứng viên đã được TF-IDF lọc. Không chạy hàng loạt liên tục khi demo.
-4. **Mỗi khi sửa `models.py`** trong bất kỳ app nào, phải chạy `makemigrations` rồi `migrate` (xem mục
-   4.3), nếu không DB sẽ không khớp với code.
-5. **Ngưỡng cảnh báo tương đồng (`SIMILARITY_THRESHOLD_*`) đọc từ `.env`**, không hard-code trong code —
+2. **PhoBERT service phải hoạt động** thì chức năng tạo đề tài mới và kiểm tra tương đồng mới tính được
+   embedding. Nếu service chưa chạy hoặc trả dữ liệu không hợp lệ, API trả lỗi 503 thay vì tạo vector giả.
+3. Khi chạy Django trong Docker, bảo đảm `PHOBERT_API_URL` trỏ tới máy chứa PhoBERT API và AI server
+   bind vào `0.0.0.0:8001`. Không đưa checkpoint hoặc dependency PyTorch/Transformers vào backend.
+4. Khi chuyển database đang có vector cũ/mock, chạy `python manage.py rebuild_phobert_embeddings` một
+   lần sau khi khởi động PhoBERT để lập chỉ mục lại embedding tiêu đề của các đề tài hiện có.
+5. **Mỗi khi sửa `models.py`** trong bất kỳ app nào, phải chạy `makemigrations` rồi `migrate` (xem mục
+   4.3), nếu không DB sẽ không khớp với code. Schema công nghệ/chức năng/tài liệu được thêm ở migration
+   `topics.0006_topic_resources`; snapshot đánh giá bổ sung ở `topics.0007`.
+6. **Ngưỡng cảnh báo tương đồng (`SIMILARITY_THRESHOLD_*`) đọc từ `.env`**, không hard-code trong code —
    muốn đổi ngưỡng chỉ cần sửa `.env` rồi restart backend, không cần sửa `similarity.py`.
-6. **Route quản lý riêng** (`/api/v1/management/...`) tách hẳn khỏi route nghiệp vụ thông thường — khi
+7. **Route quản lý riêng** (`/api/v1/management/...`) tách hẳn khỏi route nghiệp vụ thông thường — khi
    thêm chức năng chỉ dành cho Admin/Trưởng bộ môn (ví dụ: khóa tài khoản, xem log hệ thống), thêm vào
    `apps/common/management_urls.py` và app tương ứng, không gộp chung với route CRUD bình thường để dễ
    quản lý permission.
-7. **Frontend gọi API quản lý riêng** qua `features/approval/api.ts` và `features/academics/api.ts` —
+8. **Frontend gọi API quản lý riêng** qua `features/approval/api.ts` và `features/academics/api.ts` —
    các route này được chặn thêm ở Frontend bằng `RoleGuard` (`shared/components/RoleGuard.tsx`) để ẩn UI,
    nhưng **bảo mật thật sự nằm ở Backend** (`IsAdminOrDepartmentHead`, `IsAdmin` trong
    `apps/common/permissions.py`) — không được xóa permission ở Backend dù đã chặn UI ở Frontend.
-8. **Cấu hình similarity**: `SIMILARITY_PREFILTER_TOP_K` quy định số ứng viên đưa sang bước chấm AI,
-   `SIMILARITY_MIN_DISPLAY` loại kết quả quá thấp và `SIMILARITY_TOP_N` giới hạn số kết quả cuối.
-   Model Groq được chọn bằng `GROQ_SIMILARITY_MODEL`.
-9. **WeasyPrint (xuất PDF)** cần system dependencies đã cài sẵn trong `backend/Dockerfile`. Nếu chạy
+9. **pgvector**: dùng image `pgvector/pgvector:pg16` thay vì `postgres:16` thường (đã cấu hình sẵn trong
+   `docker-compose.yml`). Nếu đổi sang model embedding khác (số chiều vector khác 768), phải sửa
+   `EMBEDDING_DIM` trong `apps/topics/models.py` rồi tạo lại migration.
+10. **WeasyPrint (xuất PDF)** cần system dependencies đã cài sẵn trong `backend/Dockerfile`. Nếu chạy
    Backend ngoài Docker (không khuyến khích), phải tự cài `libpango`, `libcairo`, `libgdk-pixbuf` theo hệ
    điều hành đang dùng.
-10. **Trước khi commit**, luôn chạy `git status` kiểm tra không có file `.env`, `node_modules/`,
+11. **Trước khi commit**, luôn chạy `git status` kiểm tra không có file `.env`, `node_modules/`,
     `__pycache__/`, `staticfiles/` bị lọt vào — xem mục 5.
 
-## 7. TODO gợi ý (phần mở rộng, chưa triển khai đầy đủ trong khung này)
+## 7. TODO gợi ý (phần mở rộng)
 
 - Biểu đồ trực quan cho trang Thống kê (gợi ý dùng `recharts`, dữ liệu đã có sẵn ở `/statistics/overview/`)
 - CRUD UI đầy đủ cho trang Danh mục hệ thống (`features/academics/pages/AcademicsPage.tsx` hiện mới có khung)

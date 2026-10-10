@@ -34,6 +34,9 @@ export interface SimilarTopicResult {
 }
 
 export interface StoredSimilarityResult {
+  groq_score?: number | null;
+  groq_explanation?: string;
+  assessment_status?: string;
   id: number;
   similar_topic: number;
   similar_topic_title: string;

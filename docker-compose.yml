@@ -1,6 +1,5 @@
-# Docker Compose cho môi trường PHÁT TRIỂN (dev): hot reload cho cả Backend và Frontend.
-# Toàn bộ giá trị nhạy cảm (mật khẩu DB, SECRET_KEY, GROQ_API_KEY...) đọc từ file .env
-# ở từng thư mục (backend/.env, frontend/.env) — KHÔNG hard-code trong file này.
+# Môi trường phát triển: PostgreSQL, Django, React và PhoBERT.
+# Tạo backend/.env từ backend/.env.example trước khi chạy.
 
 services:
   db:
@@ -14,10 +13,32 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+
+  ai:
+    build:
+      context: ./AI_KiemTraTrung_TruongBoMon
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      MODEL_NAME: ${PHOBERT_MODEL_NAME:-vinai/phobert-base-v2}
+      HF_HOME: /root/.cache/huggingface
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    volumes:
+      - ./AI_KiemTraTrung_TruongBoMon/models/tier1_best.pt:/app/models/tier1_best.pt:ro
+      - huggingface_cache:/root/.cache/huggingface
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /app/models/tier1_best.pt && python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
 
   backend:
     build:
@@ -28,12 +49,17 @@ services:
     command: ["runserver"]
     env_file:
       - ./backend/.env
+    environment:
+      PHOBERT_API_URL: http://ai:8001
     volumes:
       - ./backend:/app
+      - backend_static:/app/staticfiles
     ports:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+      ai:
         condition: service_healthy
 
   frontend:
@@ -41,8 +67,9 @@ services:
       context: ./frontend
       target: dev
     restart: unless-stopped
-    env_file:
-      - ./frontend/.env
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+      CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -53,3 +80,5 @@ services:
 
 volumes:
   pgdata:
+  backend_static:
+  huggingface_cache:

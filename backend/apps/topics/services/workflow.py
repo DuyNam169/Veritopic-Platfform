@@ -9,7 +9,7 @@ from .similarity import find_similar_topics, is_exact_duplicate, normalize_text
 @transaction.atomic
 def refresh_similarity_results(topic: Topic):
     """Tính lại kết quả trên toàn bộ ngân hàng đề tài và thay thế snapshot đã lưu."""
-    results = find_similar_topics(topic)
+    results = find_similar_topics(topic, refresh_embedding=True)
     existing_titles = list(Topic.objects.exclude(pk=topic.pk).values_list("title", flat=True))
     exact_duplicate = is_exact_duplicate(topic.title, existing_titles)
     normalized_title = normalize_text(topic.title)
@@ -17,7 +17,7 @@ def refresh_similarity_results(topic: Topic):
     for result in results:
         exact_match = exact_duplicate and normalize_text(result["topic"].title) == normalized_title
         final_results.append({
-            "topic": result["topic"],
+            **result,
             "similarity_percent": 100.0 if exact_match else result["similarity_percent"],
             "warning_level": "duplicate" if exact_match else result["warning_level"],
         })
@@ -29,8 +29,12 @@ def refresh_similarity_results(topic: Topic):
             similar_topic=result["topic"],
             similarity_percent=result["similarity_percent"],
             warning_level=result["warning_level"],
+            rank=rank,
+            groq_score=result.get("groq_score"),
+            groq_explanation=result.get("groq_explanation", ""),
+            assessment_status=result.get("assessment_status", "disabled"),
         )
-        for result in final_results
+        for rank, result in enumerate(final_results, 1)
     ])
     return {"exact_duplicate": exact_duplicate, "similar_results": final_results}
 
@@ -38,11 +42,10 @@ def refresh_similarity_results(topic: Topic):
 @transaction.atomic
 def propose_topic(topic: Topic, actor):
     """
-    Được gọi ngay sau khi Giảng viên tạo đề tài mới. Chạy đủ 2 bước kiểm tra (theo đúng
-    Chương 2, mục 2.1.5):
+    Được gọi ngay sau khi Giảng viên tạo đề tài mới. Pipeline kết hợp:
       Bước 1 — kiểm tra trùng tên chính xác (so khớp chuỗi, không cần AI).
       Bước 2 — TF-IDF lọc ứng viên trên toàn bộ ngân hàng đề tài.
-      Bước 3 — mô hình ngôn ngữ chấm ngữ nghĩa và kết hợp với điểm từ vựng.
+      Bước 3 — PhoBERT tính điểm nền tảng; Groq tùy chọn đánh giá bổ sung, giữ riêng điểm.
     """
     refresh_result = refresh_similarity_results(topic)
     exact_duplicate = refresh_result["exact_duplicate"]

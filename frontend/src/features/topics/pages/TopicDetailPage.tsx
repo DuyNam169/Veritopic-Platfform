@@ -8,6 +8,7 @@ import { useAuthStore } from "@/features/auth/store";
 import { Button, ErrorState, PageSkeleton, Panel, fieldClass } from "@/shared/components/ui";
 import { toast } from "@/shared/lib/toast";
 import { topicsApi } from "../api";
+import TopicResourcesPanel from "../components/TopicResourcesPanel";
 import { StoredSimilarityList } from "../components/StoredSimilarityList";
 import { useStoredSimilarityResults, useTopicDetail, useTopicHistory } from "../hooks";
 import type { Topic, TopicUpdatePayload } from "../types";
@@ -121,6 +122,11 @@ export default function TopicDetailPage() {
       </Panel>
 
       {topic.review_note && <section className="rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-semibold text-amber-900">Phản hồi duyệt</h2><p className="mt-1 text-sm text-amber-800">{topic.review_note}</p></section>}
+
+      <TopicResourcesPanel
+        topicId={topic.id}
+        canEdit={isAdmin || (user?.role === "teacher" && user.id === topic.proposed_by)}
+      />
 
       <Panel>
         <div className="flex flex-wrap items-center justify-between gap-3">
