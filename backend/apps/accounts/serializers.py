@@ -11,7 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "username", "email", "first_name", "last_name",
             "role", "avatar", "phone_number", "department", "cohort", "student_code",
-            "created_at", "last_login",
+            "class_name", "created_at", "last_login",
         )
         # This serializer is also used by /auth/me/.  Never let a user change
         # their own role (or any other account's password) through that route.
@@ -70,8 +70,8 @@ class UserManagementSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id", "username", "email", "password", "first_name", "last_name",
-            "role", "avatar", "phone_number", "department", "cohort", "student_code", "is_active",
-            "department_name", "cohort_name",
+            "role", "avatar", "phone_number", "department", "cohort", "student_code",
+            "class_name", "is_active", "department_name", "cohort_name",
         )
         read_only_fields = ("id", "avatar")
 
@@ -200,3 +200,44 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["role"] = user.role
         token["full_name"] = user.get_full_name() or user.username
         return token
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    """Sử dụng cho endpoint ?đăng ký công khai (AllowAny)."""
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    class Meta:
+        model = User
+        fields = (
+            "username", "email", "password", "first_name", "last_name",
+            "role", "phone_number", "department", "student_code",
+        )
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """Nhập email để yêu cầu mã OTP."""
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Không tìm thấy tài khoản với email này.")
+        return value
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """Xác thực OTP và đặt mật khẩu mới."""
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_new_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(value)
+        return value

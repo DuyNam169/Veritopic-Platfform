@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -12,6 +12,9 @@ import {
   Menu,
   X,
   ChevronRight,
+  ClipboardList,
+  PlusCircle,
+  GraduationCap,
   Search,
 } from "./icons";
 
@@ -56,10 +59,9 @@ export default function AppLayout() {
     "U";
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-      isActive
-        ? "bg-brand-100/70 text-brand-800 shadow-sm border border-brand-200"
-        : "text-slate-600 hover:text-brand-800 hover:bg-brand-50"
+    `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${isActive
+      ? "bg-brand-100/70 text-brand-800 shadow-sm border border-brand-200"
+      : "text-slate-600 hover:text-brand-800 hover:bg-brand-50"
     }`;
 
   const renderNavItems = () => (
@@ -86,6 +88,37 @@ export default function AppLayout() {
           <UserIcon className="w-4 h-4 shrink-0" />
           <span>Hồ sơ cá nhân</span>
         </NavLink>
+
+        {user?.role === "teacher" && (
+          <>
+            <div className="pt-4 pb-2 px-3">
+              <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-slate-500">
+                Giảng viên
+              </p>
+            </div>
+            <NavLink to="/teacher" end className={navLinkClass}>
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span>Tổng quan
+              </span>
+            </NavLink>
+            <NavLink to="/teacher/topics" className={navLinkClass}>
+              <BookOpen className="w-4 h-4 shrink-0" />
+              <span>Đề tài của tôi</span>
+            </NavLink>
+            <NavLink to="/teacher/propose" className={navLinkClass}>
+              <PlusCircle className="w-4 h-4 shrink-0" />
+              <span>Đề xuất đề tài</span>
+            </NavLink>
+            <NavLink to="/teacher/students" className={navLinkClass}>
+              <GraduationCap className="w-4 h-4 shrink-0" />
+              <span>Sinh viên hướng dẫn</span>
+            </NavLink>
+            <NavLink to="/teacher/progress" className={navLinkClass}>
+              <ClipboardList className="w-4 h-4 shrink-0" />
+              <span>Tiến độ đồ án</span>
+            </NavLink>
+          </>
+        )}
 
         {(user?.role === "admin" || user?.role === "department_head") && (
           <>
@@ -184,9 +217,8 @@ export default function AppLayout() {
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
-                  className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-medium border ${
-                    user ? roleBadges[user.role] : ""
-                  }`}
+                  className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-medium border ${user ? roleBadges[user.role] : ""
+                    }`}
                 >
                   {user ? roleLabels[user.role] : ""}
                 </span>

@@ -35,4 +35,8 @@ export const authApi = {
   },
   deleteAvatar: () => api.delete<User>("/auth/me/avatar/").then((r) => r.data),
   changePassword: (payload: ChangePasswordPayload) => api.post<{ detail: string }>("/auth/change-password/", payload).then((r) => r.data),
+  forgotPassword: (email: string) =>
+    api.post<{ detail: string }>("/auth/forgot-password/", { email }).then((r) => r.data),
+  resetPassword: (payload: { email: string; otp: string; new_password: string }) =>
+    api.post<{ detail: string }>("/auth/reset-password/", payload).then((r) => r.data),
 };
