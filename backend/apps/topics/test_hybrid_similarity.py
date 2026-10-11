@@ -44,7 +44,7 @@ class HybridAssessmentTests(SimpleTestCase):
         self.assertEqual([r["topic"].id for r in results], [2, 1])
         self.assertEqual(results[0]["groq_score"], 90)
         self.assertEqual(results[0]["similarity_percent"], 0)
-        self.assertEqual(results[0]["warning_level"], "normal")
+        self.assertEqual(results[0]["warning_level"], "review")
         self.assertTrue(results[0]["groq_explanation"])
 
     @override_settings(SIMILARITY_GROQ_ENABLED=True)
@@ -72,7 +72,7 @@ class HybridAssessmentTests(SimpleTestCase):
         results = assess_candidates(self.query, [Candidate(self.near, 0.9)], [1, 0])
         self.assertEqual(results[0]["similarity_percent"], 80)
         encoder.assert_called_once_with([self.near.title])
-        self.near.save.assert_called_once_with(update_fields=["embedding"])
+        self.near.save.assert_called_once_with(update_fields=["embedding", "embedding_signature"])
 
     @patch("apps.topics.models.Topic.objects")
     @patch("apps.topics.services.similarity.tfidf_prefilter")

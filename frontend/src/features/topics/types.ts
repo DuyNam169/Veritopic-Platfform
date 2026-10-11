@@ -28,6 +28,7 @@ export interface Topic {
 }
 
 export interface SimilarTopicResult {
+  assessment_status?: string;
   topic: Topic;
   similarity_percent: number;
   warning_level: WarningLevel;
@@ -40,6 +41,7 @@ export interface StoredSimilarityResult {
   id: number;
   similar_topic: number;
   similar_topic_title: string;
+  similar_topic_description?: string;
   similarity_percent: number;
   warning_level: WarningLevel;
   created_at: string;

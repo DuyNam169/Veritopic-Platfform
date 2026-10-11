@@ -89,10 +89,26 @@ def request_rename(topic: Topic, actor, note: str = ""):
 
 
 @transaction.atomic
-def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = ""):
+def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = "", due_date=None):
+    from django.contrib.auth import get_user_model
+    from rest_framework.exceptions import ValidationError
     from apps.topics.models import TopicAssignment
-
-    assignment = TopicAssignment.objects.create(topic=topic, assigned_by=actor, note=note)
+    topic = Topic.objects.select_for_update().get(pk=topic.pk)
+    ids = sorted(set(student_ids))
+    students = list(get_user_model().objects.select_for_update().filter(pk__in=ids, role="student", is_active=True, student_status="active").order_by("pk"))
+    if len(students) != len(ids) or len(ids) != len(student_ids):
+        raise ValidationError("Danh sách sinh viên không hợp lệ hoặc bị lặp.")
+    if len(ids) > topic.max_students:
+        raise ValidationError("Vượt số sinh viên tối đa của đề tài.")
+    if any(s.department_id and s.department_id != topic.department_id for s in students):
+        raise ValidationError("Sinh viên phải thuộc bộ môn của đề tài.")
+    if any(s.cohort_id and s.cohort_id != topic.cohort_id for s in students):
+        raise ValidationError("Sinh viên phải thuộc khóa học của đề tài.")
+    if topic.major_id and any(s.major_id and s.major_id != topic.major_id for s in students):
+        raise ValidationError("Sinh viên phải thuộc chuyên ngành của đề tài.")
+    if TopicAssignment.objects.filter(students__in=ids, topic__semester=topic.semester, status="active").exists():
+        raise ValidationError("Sinh viên đã có đề tài đang thực hiện trong học kỳ này.")
+    assignment = TopicAssignment.objects.create(topic=topic, assigned_by=actor, note=note, due_date=due_date)
     assignment.students.set(student_ids)
     summary = f"Giao cho {len(student_ids)} sinh viên."
     history_note = f"{summary} {note}".strip() if note else summary

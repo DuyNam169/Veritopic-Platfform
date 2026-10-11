@@ -21,13 +21,26 @@ export interface TopicListParams {
   page?: number;
 }
 
+async function topicList(params?: TopicListParams) {
+  const first = (await api.get("/topics/topics/", {params})).data;
+  if (params?.page || !first.results) return first;
+  let next = first.next;
+  const results = [...first.results];
+  while (next) {
+    const page = (await api.get(next)).data;
+    results.push(...page.results);
+    next = page.next;
+  }
+  return {...first, results, next: null};
+}
+
 export const teacherApi = {
   // Topics CRUD & Check
   getMyTopics: (params?: TopicListParams) =>
-    api.get("/topics/topics/", { params: { ...params, mine: true } }).then((r) => r.data),
+    topicList({ ...params, mine: true }),
 
   getAllTopics: (params?: TopicListParams) =>
-    api.get("/topics/topics/", { params }).then((r) => r.data),
+    topicList(params),
 
   getTopicDetail: (id: number) =>
     api.get<Topic>(`/topics/topics/${id}/`).then((r) => r.data),

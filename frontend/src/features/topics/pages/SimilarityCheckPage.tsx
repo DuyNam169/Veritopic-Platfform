@@ -8,9 +8,9 @@ import { Button, ErrorState, PageHeader, Panel, fieldClass } from "@/shared/comp
 import { topicResourcesApi, type ExtractedTitle, type SimilarityCheckResult } from "../resourcesApi";
 
 const warningStyles = {
-  duplicate: { label: "Có khả năng trùng", className: "border-rose-200 bg-rose-50 text-rose-800" },
-  high: { label: "Tương đồng cao", className: "border-orange-200 bg-orange-50 text-orange-800" },
-  review: { label: "Cần xem xét", className: "border-amber-200 bg-amber-50 text-amber-800" },
+  duplicate: { label: "Trùng tên đề tài", className: "border-rose-200 bg-rose-50 text-rose-800" },
+  high: { label: "Cần đối chiếu", className: "border-sky-200 bg-sky-50 text-sky-800" },
+  review: { label: "Cần đối chiếu", className: "border-sky-200 bg-sky-50 text-sky-800" },
   normal: { label: "Tương đồng thấp", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
 };
 
@@ -66,7 +66,7 @@ export default function SimilarityCheckPage() {
   }
 
   return <div className="mx-auto max-w-5xl space-y-6">
-    <PageHeader eyebrow="Công cụ AI" title="Kiểm tra tương đồng đề tài" description="Nhập tên đề tài hoặc tải tài liệu PDF/DOCX để trích xuất tiêu đề, sau đó đối chiếu với dữ liệu đề tài hiện có bằng PhoBERT." />
+    <PageHeader eyebrow="Công cụ AI" title="Kiểm tra tương đồng đề tài" description="Nhập tên và mô tả mục tiêu, phương pháp, sản phẩm đầu ra để tìm các đề tài gần nghĩa cần đối chiếu." />
     <Panel>
       <form onSubmit={check} className="space-y-4">
         <label className="block text-sm font-semibold text-slate-700">Tên đề tài cần kiểm tra
@@ -106,10 +106,11 @@ export default function SimilarityCheckPage() {
       {results.length ? <div className="mt-4 space-y-3">{results.map((result) => {
         const style = warningStyles[result.warning_level] ?? warningStyles.normal;
         return <article key={result.topic_id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0"><Link to={`/topics/${result.topic_id}`} className="font-semibold text-brand-700 hover:underline">{result.title}</Link><div className="mt-2 flex items-center gap-2 text-sm text-slate-600"><AlertTriangle className="h-4 w-4" />Mức tương đồng <strong>{result.percent.toFixed(1)}%</strong></div><SupplementaryAssessment result={result} /></div>
+          <div className="min-w-0"><Link to={`/topics/${result.topic_id}`} className="font-semibold text-brand-700 hover:underline">{result.title}</Link><div className="mt-2 flex items-center gap-2 text-sm text-slate-600"><AlertTriangle className="h-4 w-4" />Điểm gần nghĩa <strong>{result.percent.toFixed(1)} / 100</strong></div><SupplementaryAssessment result={result} /></div>
           <span className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${style.className}`}>{style.label}</span>
         </article>;
       })}</div> : <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Chưa có kết quả vượt ngưỡng hiển thị. Bạn có thể bổ sung mô tả hoặc kiểm tra lại tên đề tài.</p>}
+      <p className="mt-3 text-xs leading-5 text-slate-500">Điểm gần nghĩa không phải phần trăm trùng đề tài. Chưa nhập mô tả thì chỉ đối chiếu được tên; cần đọc nội dung trước khi quyết định.</p>
     </Panel>}
   </div>;
 }

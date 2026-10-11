@@ -3,9 +3,25 @@ from unittest.mock import patch
 
 from src.inference.api import Candidate, CheckTitleRequest, check_title
 from src.inference import predict
+from src.inference.api import EncodeTitlesRequest, encode_title_batch, health_check
+from fastapi import HTTPException
 
 
 class CheckTitleEmbeddingTests(unittest.TestCase):
+    @patch("src.inference.api.get_model", side_effect=FileNotFoundError("missing checkpoint"))
+    def test_health_rejects_missing_checkpoint(self, _validate):
+        with self.assertRaises(HTTPException) as error:
+            health_check()
+        self.assertEqual(error.exception.status_code, 503)
+        self.assertEqual(error.exception.detail, "missing checkpoint")
+
+    @patch("src.inference.api.encode_titles", side_effect=FileNotFoundError("missing checkpoint"))
+    def test_encode_reports_missing_checkpoint_as_503(self, _encode):
+        with self.assertRaises(HTTPException) as error:
+            encode_title_batch(EncodeTitlesRequest(titles=["Test title"]))
+        self.assertEqual(error.exception.status_code, 503)
+        self.assertEqual(error.exception.detail, "missing checkpoint")
+
     @patch("src.inference.api.rank_title_candidates")
     def test_passes_database_embedding_to_ranker(self, rank_candidates):
         rank_candidates.return_value = []

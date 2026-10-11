@@ -26,7 +26,7 @@ export interface ChangePasswordPayload {
 
 export const authApi = {
   login: (payload: LoginPayload) => api.post<LoginResponse>("/auth/login/", payload).then((r) => r.data),
-  me: () => api.get<User>("/auth/me/").then((r) => r.data),
+  me: (accessToken?: string) => api.get<User>("/auth/me/", accessToken ? {headers: {Authorization: `Bearer ${accessToken}`}} : undefined).then((r) => r.data),
   updateProfile: (payload: UpdateProfilePayload) => api.patch<User>("/auth/me/", payload).then((r) => r.data),
   uploadAvatar: (avatar: File) => {
     const form = new FormData();

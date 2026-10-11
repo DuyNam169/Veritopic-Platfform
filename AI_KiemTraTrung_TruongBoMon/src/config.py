@@ -10,6 +10,9 @@ load_dotenv(ROOT_DIR / ".env")
 # AI CONFIG
 # ============================================================
 MODEL_NAME = os.getenv( "MODEL_NAME","vinai/phobert-base-v2")
+MODEL_MODE = os.getenv("MODEL_MODE", "checkpoint").strip().lower()
+if MODEL_MODE not in {"checkpoint", "pretrained", "sentence_embedding"}:
+    raise ValueError("MODEL_MODE must be checkpoint, pretrained or sentence_embedding.")
 MAX_LENGTH = int(os.getenv("MAX_LENGTH", "128"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "4"))
 EPOCHS = int(os.getenv("EPOCHS", "5"))

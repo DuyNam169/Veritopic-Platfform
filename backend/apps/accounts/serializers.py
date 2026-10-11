@@ -1,21 +1,47 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from apps.common.validation import validate_academic_links, validate_optional_code
 
 User = get_user_model()
 
 
+class AcademicProfileValidationMixin:
+    def validate_lecturer_code(self, value):
+        return validate_optional_code(User, "lecturer_code", value, self.instance)
+
+    def validate_profile(self, attrs):
+        request = self.context.get("request")
+        department = request.user.department if request and request.user.role == "department_head" else None
+        validate_academic_links(attrs, self.instance, department=department)
+        role = attrs.get("role", getattr(self.instance, "role", "student"))
+        code = attrs.get("lecturer_code", getattr(self.instance, "lecturer_code", ""))
+        if code and role not in ("teacher", "department_head"):
+            raise serializers.ValidationError({"lecturer_code": "Mã giảng viên chỉ dành cho giảng viên hoặc trưởng bộ môn."})
+        if role != "student" and attrs.get("academic_year", getattr(self.instance, "academic_year", None)):
+            raise serializers.ValidationError({"academic_year": "Năm học hồ sơ chỉ dành cho sinh viên."})
+
+
 class UserSerializer(serializers.ModelSerializer):
+    def update(self, instance, validated_data):
+        # A profile edit must not overwrite academic fields changed concurrently.
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        if validated_data:
+            instance.save(update_fields=[*validated_data, "updated_at"])
+        return instance
+
     class Meta:
         model = User
         fields = (
             "id", "username", "email", "first_name", "last_name",
             "role", "avatar", "phone_number", "department", "cohort", "student_code",
             "class_name", "created_at", "last_login",
+            "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
         )
         # This serializer is also used by /auth/me/.  Never let a user change
         # their own role (or any other account's password) through that route.
-        read_only_fields = ("id", "role", "department", "cohort", "student_code", "created_at", "last_login", "username")
+        read_only_fields = ("id", "role", "department", "cohort", "student_code", "created_at", "last_login", "username", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status")
 
     def validate_email(self, value):
         existing = User.objects.filter(email__iexact=value).exclude(pk=self.instance.pk if self.instance else None)
@@ -58,7 +84,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         return user
 
 
-class UserManagementSerializer(serializers.ModelSerializer):
+class UserManagementSerializer(AcademicProfileValidationMixin, serializers.ModelSerializer):
     """Admin-only serializer; accepts an initial password for new accounts."""
 
     password = serializers.CharField(write_only=True, min_length=8, required=False)
@@ -72,6 +98,7 @@ class UserManagementSerializer(serializers.ModelSerializer):
             "id", "username", "email", "password", "first_name", "last_name",
             "role", "avatar", "phone_number", "department", "cohort", "student_code",
             "class_name", "is_active", "department_name", "cohort_name",
+            "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
         )
         read_only_fields = ("id", "avatar")
 
@@ -91,6 +118,7 @@ class UserManagementSerializer(serializers.ModelSerializer):
         return username
 
     def validate(self, attrs):
+        self.validate_profile(attrs)
         instance = self.instance
         if not instance and not attrs.get("password"):
             raise serializers.ValidationError({"password": "Mật khẩu ban đầu là bắt buộc."})
@@ -140,7 +168,7 @@ class UserManagementSerializer(serializers.ModelSerializer):
         return instance
 
 
-class PeopleProfileSerializer(serializers.ModelSerializer):
+class PeopleProfileSerializer(AcademicProfileValidationMixin, serializers.ModelSerializer):
     """Manager-maintained academic profile without creating login credentials."""
 
     role = serializers.ChoiceField(choices=("teacher", "student"))
@@ -154,6 +182,7 @@ class PeopleProfileSerializer(serializers.ModelSerializer):
             "id", "username", "email", "first_name", "last_name", "role",
             "phone_number", "department", "department_name", "cohort",
             "cohort_name", "student_code", "is_active",
+            "class_name", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
         )
         read_only_fields = ("id", "is_active")
 
@@ -176,6 +205,7 @@ class PeopleProfileSerializer(serializers.ModelSerializer):
         return username
 
     def validate(self, attrs):
+        self.validate_profile(attrs)
         role = attrs.get("role", self.instance.role if self.instance else None)
         if self.instance and role != self.instance.role:
             raise serializers.ValidationError({"role": "Không thể đổi vai trò trong màn hình hồ sơ."})
@@ -203,6 +233,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(choices=("student",), default="student")
     """Sử dụng cho endpoint ?đăng ký công khai (AllowAny)."""
     password = serializers.CharField(write_only=True, min_length=8)
 

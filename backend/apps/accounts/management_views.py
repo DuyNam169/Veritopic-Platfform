@@ -51,3 +51,27 @@ class PeopleDirectoryViewSet(
     ).order_by("role", "last_name", "first_name", "id")
     filterset_fields = ("role", "department", "cohort", "is_active")
     search_fields = ("username", "email", "first_name", "last_name", "student_code")
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.role == "department_head":
+            return qs.filter(department_id=user.department_id) if user.department_id else qs.none()
+        return qs
+
+    def _save_profile(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+        user = self.request.user
+        if user.role == "department_head":
+            department = serializer.validated_data.get("department", getattr(serializer.instance, "department", None))
+            if not user.department_id or (department and department.pk != user.department_id):
+                raise PermissionDenied("Chỉ được quản lý hồ sơ trong bộ môn phụ trách.")
+            serializer.save(department_id=user.department_id)
+        else:
+            serializer.save()
+
+    def perform_create(self, serializer):
+        self._save_profile(serializer)
+
+    def perform_update(self, serializer):
+        self._save_profile(serializer)

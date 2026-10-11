@@ -5,12 +5,14 @@ import { Loader2 } from "@/shared/components/icons";
 import { queryClient } from "@/shared/lib/queryClient";
 import { useCurrentUser } from "@/features/auth/hooks";
 import ToastContainer from "@/shared/components/Toast";
+import { useAuthStore } from "@/features/auth/store";
 
 function AuthBootstrap({ children }: { children: ReactNode }) {
-  const accessToken = localStorage.getItem("access_token");
+  const accessToken = useAuthStore(s => s.accessToken);
+  const user = useAuthStore(s => s.user);
   const { isLoading } = useCurrentUser();
 
-  if (accessToken && isLoading) {
+  if (accessToken && !user && isLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-brand-50 text-slate-900">
         <div className="relative mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-600 to-brand-700 border border-brand-600 shadow-lg animate-pulse">

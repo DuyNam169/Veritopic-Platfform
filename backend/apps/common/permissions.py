@@ -63,4 +63,4 @@ class IsTopicOwnerOrAdmin(BasePermission):
     message = "Bạn chỉ có thể chỉnh sửa đề tài do chính mình đề xuất."
 
     def has_object_permission(self, request, view, obj):
-        return request.user.role == "admin" or obj.proposed_by_id == request.user.id
+        return request.user.role == "admin" or (request.user.role == "teacher" and obj.proposed_by_id == request.user.id)

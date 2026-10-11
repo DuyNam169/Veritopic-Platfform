@@ -15,6 +15,8 @@ def check_is_assignment_late(assignment: TopicAssignment) -> bool:
     """
     if assignment.status != TopicAssignment.Status.ACTIVE:
         return False
+    if assignment.due_date and assignment.due_date < timezone.localdate():
+        return True
 
     late_days = getattr(settings, "PROGRESS_LATE_AFTER_DAYS", 7)
     threshold_date = timezone.now() - timedelta(days=late_days)

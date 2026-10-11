@@ -520,6 +520,21 @@ class TopicResourceAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(finder.call_args.args[0].description, "Mục tiêu và công nghệ")
 
+    @patch("apps.topics.views.find_similar_topics", return_value=[])
+    def test_custom_source_description_is_a_transient_query(self, finder):
+        self.client.force_authenticate(self.owner)
+        original_description = self.topic.description
+        response = self.client.post(reverse("similarity-check-check"), {
+            "source_topic_id": self.topic.pk, "title": self.topic.title,
+            "description": "Mô tả mới dùng riêng để kiểm tra",
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        query = finder.call_args.args[0]
+        self.assertIsNone(query.pk)
+        self.assertEqual(query.description, "Mô tả mới dùng riêng để kiểm tra")
+        self.topic.refresh_from_db()
+        self.assertEqual(self.topic.description, original_description)
+
     def test_postgres_hybrid_query_and_snapshot_preserve_separate_scores_and_rank(self):
         from django.db import connection
         from .services.similarity import SemanticScores
@@ -539,6 +554,7 @@ class TopicResourceAPITests(APITestCase):
         scores.explanations = {related.id: "Cùng mục tiêu quản lý."}
         self.client.force_authenticate(self.owner)
         with override_settings(SIMILARITY_GROQ_ENABLED=True), \
+                patch("apps.topics.services.similarity.refresh_topic_embeddings"), \
                 patch("apps.topics.services.similarity.get_embedding", return_value=vector), \
                 patch("apps.topics.services.similarity.score_candidates_semantically", return_value=scores):
             response = self.client.post(reverse("similarity-check-check"), {
@@ -559,6 +575,34 @@ class TopicResourceAPITests(APITestCase):
 
 
 class PhoBERTEmbeddingTests(SimpleTestCase):
+    @patch("apps.topics.services.similarity.requests.post")
+    def test_reports_checkpoint_detail_from_unavailable_service(self, post):
+        from apps.topics.services.similarity import get_embedding, SimilarityServiceUnavailable
+
+        response = Mock(status_code=503)
+        response.json.return_value = {"detail": "Thiếu file checkpoint PhoBERT đã huấn luyện."}
+        response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=response)
+        post.return_value = response
+
+        with self.assertRaises(SimilarityServiceUnavailable) as error:
+            get_embedding("Đề tài kiểm thử")
+
+        self.assertIn("Thiếu file checkpoint", str(error.exception.detail))
+
+    @patch("apps.topics.services.similarity.requests.post")
+    def test_reports_http_status_when_service_error_is_not_json(self, post):
+        from apps.topics.services.similarity import get_embedding, SimilarityServiceUnavailable
+
+        response = Mock(status_code=503)
+        response.json.side_effect = ValueError("not JSON")
+        response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=response)
+        post.return_value = response
+
+        with self.assertRaises(SimilarityServiceUnavailable) as error:
+            get_embedding("Đề tài kiểm thử")
+
+        self.assertIn("HTTP 503", str(error.exception.detail))
+
     @override_settings(PHOBERT_API_URL="http://pho:8001/", PHOBERT_API_TIMEOUT=7)
     @patch("apps.topics.services.similarity.requests.post")
     def test_requests_and_returns_a_768_value_phobert_embedding(self, post):

@@ -6,7 +6,7 @@ Mục tiêu: nhận tên đề tài mới, tính mức độ tương đồng v�
 - Vietnamese Transformer: `vinai/phobert-base-v2`
 - Kiến trúc: Siamese encoder dùng chung PhoBERT
 - Similarity: cosine similarity
-- Huấn luyện: regression với target 5 mức (0..4), ánh xạ về [-1, 1]
+- Huấn luyện: regression với target 5 mức (0..4), ánh xạ về [0, 1]
 - Đánh giá: MAE, RMSE, Spearman, Accuracy/F1 sau khi lượng tử hóa về 5 mức, confusion matrix.
 - Biểu đồ: train/validation loss, prediction-vs-label, confusion matrix.
 
@@ -55,12 +55,17 @@ pip install -r requirements.txt
 Từ thư mục gốc:
 
 ```bash
-python -m src.train
-python -m src.evaluate
-python -m src.predict
+python -m src.training.train
+python -m src.training.evaluate
+python -m src.inference.predict
 ```
 
 Lần đầu chạy Hugging Face sẽ tải PhoBERT về cache.
+
+Lệnh train tạo checkpoint `models/tier1_best.pt`. Đường dẫn này phải là file;
+nếu Docker đã tạo thư mục rỗng cùng tên, cần xóa thư mục rỗng trước khi train.
+Container AI mặc định chỉ cài thư viện inference và PyTorch CPU, nên không thể
+chạy train trực tiếp trong container đó khi chưa bổ sung thư viện huấn luyện.
 
 ## API cho backend
 
@@ -72,6 +77,17 @@ python -m uvicorn src.inference.api:app --host 127.0.0.1 --port 8001
 ```
 
 AI Service chạy cổng `8001`; Django backend chạy riêng ở cổng `8000`.
+Mặc định khi chạy Python trực tiếp, API dùng checkpoint đã train. Nếu chưa có
+checkpoint và chỉ cần chạy thử với PhoBERT gốc, đặt `$env:MODEL_MODE="pretrained"`
+trong PowerShell trước khi chạy uvicorn. Compose mặc định chọn chế độ này qua
+`PHOBERT_MODEL_MODE=sentence_embedding` dùng model `dangvantuan/vietnamese-embedding`,
+đã huấn luyện cho so sánh câu tiếng Việt, kèm tách từ PyVi. Khi chạy trực tiếp,
+đặt cả `$env:MODEL_MODE="sentence_embedding"` và
+`$env:MODEL_NAME="dangvantuan/vietnamese-embedding"` (cần cài `pyvi`).
+Điểm và ngưỡng cảnh báo chưa được hiệu chỉnh
+cho đề tài thực tế khi dùng PhoBERT gốc. `/health` trả tên/chế độ model và chỉ
+báo thành công sau khi model được nạp. Khi đổi model, cần rebuild vector đề tài
+và chạy lại kiểm tra để cập nhật kết quả đã lưu.
 Mở `http://localhost:8001/docs` để test bằng Swagger UI. Endpoint kiểm tra là `POST /api/v1/check-title`:
 
 ```json

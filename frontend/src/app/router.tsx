@@ -28,6 +28,8 @@ import { ProgressDetailPage } from "@/features/teacher/pages/ProgressDetailPage"
 import PeopleDirectoryPage from "@/features/people/pages/PeopleDirectoryPage";
 import SimilarityCheckPage from "@/features/topics/pages/SimilarityCheckPage";
 import TechnologiesPage from "@/features/academics/pages/TechnologiesPage";
+import ProjectsPage from "@/features/progress/ProjectsPage";
+import ProjectDetailPage from "@/features/progress/ProjectDetailPage";
 
 /**
  * Route quản lý riêng (Duyệt đề tài, Danh mục hệ thống) được tách nhóm bằng RoleGuard,
@@ -52,6 +54,8 @@ export const router = createBrowserRouter([
             children: [{ path: "/topics/similarity", element: <SimilarityCheckPage /> }],
           },
           { path: "/profile", element: <ProfilePage /> },
+          { path: "/projects", element: <ProjectsPage /> },
+          { path: "/projects/:assignmentId", element: <ProjectDetailPage /> },
           {
             element: <RoleGuard allow={["admin", "department_head"]} />,
             children: [

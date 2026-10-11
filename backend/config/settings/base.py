@@ -147,6 +147,8 @@ CORS_ALLOW_CREDENTIALS = True
 # ===== PhoBERT similarity service (chạy độc lập với Django) =====
 PHOBERT_API_URL = env("PHOBERT_API_URL", default="http://127.0.0.1:8001").rstrip("/")
 PHOBERT_API_TIMEOUT = env.int("PHOBERT_API_TIMEOUT", default=60)
+SIMILARITY_EMBEDDING_MODEL = env("SIMILARITY_EMBEDDING_MODEL", default="dangvantuan/vietnamese-embedding")
+SIMILARITY_EMBEDDING_MODE = env("SIMILARITY_EMBEDDING_MODE", default="sentence_embedding")
 
 # ===== Groq API (đọc từ biến môi trường, KHÔNG hard-code) =====
 SIMILARITY_GROQ_ENABLED = env.bool("SIMILARITY_GROQ_ENABLED", default=False)

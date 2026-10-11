@@ -20,7 +20,12 @@ export default function TechnologiesPage() {
   const [editing, setEditing] = useState<Partial<Technology> | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
   const technologies = useQuery({ queryKey: ["topic-technology-catalog"], queryFn: topicResourcesApi.technologies });
+  const rows = (technologies.data ?? []).filter((item) => (!category || item.category === category)
+    && `${item.name} ${item.category} ${item.description}`.toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi")));
+  const categories = [...new Set((technologies.data ?? []).map((item) => item.category))];
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,15 +67,16 @@ export default function TechnologiesPage() {
     <PageHeader eyebrow="Quản trị hệ thống" title="Danh mục công nghệ" description="Quản lý các công nghệ có thể gắn vào đề tài như ngôn ngữ, framework, cơ sở dữ liệu và công cụ." actions={<Button variant="primary" onClick={() => { setEditing({}); setError(""); }}>+ Thêm công nghệ</Button>} />
     {error && <ErrorState message={error} />}
     <Panel>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4"><div><h2 className="font-semibold text-slate-900">Công nghệ dùng chung</h2><p className="mt-1 text-sm text-slate-500">Chọn từ danh mục này khi khai báo công nghệ sử dụng trong một đề tài.</p><p className="mt-2 text-xs font-medium text-brand-700">{rows.length} / {technologies.data?.length ?? 0} công nghệ · {categories.length} nhóm</p></div><div className="flex w-full flex-wrap gap-3 sm:w-auto"><label className="flex-1 text-xs font-medium text-slate-600">Tìm công nghệ<input className={fieldClass} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tên, nhóm hoặc mô tả..." /></label><label className="flex-1 text-xs font-medium text-slate-600">Nhóm công nghệ<select className={fieldClass} value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Tất cả nhóm</option>{categories.map((name) => <option key={name} value={name}>{name}</option>)}</select></label></div></div>
       {technologies.isLoading ? <p className="text-sm text-slate-500">Đang tải danh mục...</p>
         : technologies.isError ? <ErrorState message="Không tải được danh mục công nghệ." retry={() => { void technologies.refetch(); }} />
           : technologies.data?.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500"><tr><th className="py-3 pr-4">Tên công nghệ</th><th className="py-3 pr-4">Nhóm</th><th className="py-3 pr-4">Mô tả</th><th className="py-3 text-right">Thao tác</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">{technologies.data.map((item) => <tr key={item.id}>
-              <td className="py-3 pr-4 font-semibold text-slate-900">{item.name}</td><td className="py-3 pr-4">{item.category}</td><td className="py-3 pr-4 text-slate-600">{item.description || "—"}</td>
+            <tbody className="divide-y divide-slate-100">{rows.map((item) => <tr key={item.id}>
+              <td className="py-3 pr-4 font-semibold text-slate-900">{item.name}</td><td className="whitespace-nowrap py-3 pr-4"><span className="rounded-full bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700">{item.category}</span></td><td className="py-3 pr-4 leading-6 text-slate-600">{item.description || "—"}</td>
               <td className="py-3 text-right"><button disabled={busy} className="mr-3 font-semibold text-brand-700 hover:underline" onClick={() => { setEditing(item); setError(""); }}>Sửa</button><button disabled={busy} className="font-semibold text-rose-600 hover:underline" onClick={() => void remove(item)}>Xóa</button></td>
             </tr>)}</tbody>
-          </table></div> : <p className="text-sm text-slate-500">Chưa có công nghệ nào trong danh mục.</p>}
+          </table>{!rows.length && <p className="py-10 text-center text-sm text-slate-500">Không có công nghệ phù hợp. Hãy đổi từ khóa hoặc nhóm công nghệ.</p>}</div> : <p className="text-sm text-slate-500">Chưa có công nghệ nào trong danh mục.</p>}
     </Panel>
 
     {editing && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">

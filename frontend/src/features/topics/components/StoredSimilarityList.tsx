@@ -5,32 +5,9 @@ import type { StoredSimilarityResult, WarningLevel } from "../types";
 
 const levelStyles: Record<WarningLevel, { label: string; badge: string }> = {
   normal: { label: "Bình thường", badge: "border-slate-200 bg-slate-100 text-slate-600" },
-  review: { label: "Cần xem xét", badge: "border-amber-200 bg-amber-50 text-amber-700" },
+  review: { label: "Cần đối chiếu", badge: "border-sky-200 bg-sky-50 text-sky-700" },
   high: { label: "Tương đồng cao", badge: "border-orange-200 bg-orange-50 text-orange-700" },
-  duplicate: { label: "Có khả năng trùng", badge: "border-rose-200 bg-rose-50 text-rose-700" },
-};
-
-const summaryStyles: Record<WarningLevel, { title: string; description: string; className: string }> = {
-  normal: {
-    title: "Mức tương đồng tên thấp trong các kết quả đang hiển thị",
-    description: "Các kết quả bên dưới đều dưới ngưỡng cảnh báo 50% và chỉ dùng để đối chiếu tham khảo.",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  },
-  review: {
-    title: "Có nội dung cần xem xét",
-    description: "Ít nhất một đề tài đạt trên 50%. Nên đọc mô tả hai đề tài trước khi quyết định.",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
-  },
-  high: {
-    title: "Phát hiện mức tương đồng cao",
-    description: "Ít nhất một đề tài đạt trên 70%. Cần kiểm tra kỹ phạm vi, phương pháp và sản phẩm đầu ra.",
-    className: "border-orange-200 bg-orange-50 text-orange-800",
-  },
-  duplicate: {
-    title: "Có khả năng trùng đề tài",
-    description: "Ít nhất một kết quả vượt 85%. Không nên phê duyệt trước khi đối chiếu nội dung chi tiết.",
-    className: "border-rose-200 bg-rose-50 text-rose-800",
-  },
+  duplicate: { label: "Trùng tên đề tài", badge: "border-rose-200 bg-rose-50 text-rose-700" },
 };
 
 export function StoredSimilarityList({ results }: { results: StoredSimilarityResult[] }) {
@@ -38,10 +15,16 @@ export function StoredSimilarityList({ results }: { results: StoredSimilarityRes
     return <p className="mt-3 text-sm text-slate-500">Không có kết quả nào vượt ngưỡng hiển thị.</p>;
   }
 
-  const highest = results.reduce((current, result) =>
-    result.similarity_percent > current.similarity_percent ? result : current
-  );
-  const summary = summaryStyles[highest.warning_level];
+  const exactMatch = results.some((result) => result.assessment_status === "exact_match");
+  const summary = exactMatch ? {
+    title: "Có đề tài trùng tên",
+    description: "Tên khớp sau khi chuẩn hóa. Đọc mô tả và phạm vi để xác định có trùng nội dung hay không.",
+    className: "border-rose-200 bg-rose-50 text-rose-800",
+  } : {
+    title: "Các đề tài gợi ý để đối chiếu",
+    description: "Danh sách được xếp theo mức gần nghĩa của tên và mô tả. Điểm cao chưa đủ để kết luận trùng đề tài.",
+    className: "border-sky-200 bg-sky-50 text-sky-800",
+  };
 
   return <>
     <div className={`mt-4 rounded-xl border p-4 ${summary.className}`}>
@@ -50,20 +33,20 @@ export function StoredSimilarityList({ results }: { results: StoredSimilarityRes
     </div>
     <div className="mt-3 space-y-2">
       {results.map((result) => {
-        const level = levelStyles[result.warning_level];
+        const level = levelStyles[result.assessment_status === "exact_match" ? "duplicate" : "review"];
         return <div key={result.id} className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-white p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1"><Link to={`/topics/${result.similar_topic}`} className="font-medium text-blue-700 hover:underline">
             {result.similar_topic_title}
-          </Link><SupplementaryAssessment result={result} /></div>
+          </Link><p className="mt-1 text-xs leading-5 text-slate-500">{result.similar_topic_description || "Chưa có mô tả; cần bổ sung để đối chiếu nội dung."}</p><SupplementaryAssessment result={result} /></div>
           <div className="flex shrink-0 items-center gap-2">
             <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${level.badge}`}>{level.label}</span>
-            <span className="w-14 text-right font-bold tabular-nums text-slate-800">{result.similarity_percent.toFixed(1)}%</span>
+            <span title="Điểm gần nghĩa, không phải tỷ lệ trùng" className="whitespace-nowrap text-right font-bold tabular-nums text-slate-800">{result.similarity_percent.toFixed(1)} / 100</span>
           </div>
         </div>;
       })}
     </div>
     <p className="mt-3 text-xs leading-5 text-slate-400">
-      Tỷ lệ phản ánh mức tương đồng tên đề tài. Điểm đánh giá nội dung bổ sung được hiển thị riêng khi có; cả hai hỗ trợ người duyệt đối chiếu và không thay thế quyết định chuyên môn.
+      Điểm gần nghĩa được tính từ tên và mô tả, không phải phần trăm trùng hoặc xác suất trùng đề tài. Cần đối chiếu mục tiêu, phạm vi, phương pháp và sản phẩm đầu ra; nếu thiếu mô tả, kết quả chỉ dựa trên tên. Điểm đánh giá nội dung bổ sung được hiển thị riêng khi có.
     </p>
   </>;
 }

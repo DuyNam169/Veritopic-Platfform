@@ -5,10 +5,22 @@ import { useAuthStore } from "./store";
 
 export function useLogin() {
   const setAuth = useAuthStore((s) => s.setAuth);
+  const setUser = useAuthStore((s) => s.setUser);
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: LoginPayload) => authApi.login(payload),
-    onSuccess: (data) => setAuth(data.access, data.refresh),
+    mutationFn: async (payload: LoginPayload) => {
+      const tokens = await authApi.login({...payload, username: payload.username.trim()});
+      const user = await authApi.me(tokens.access);
+      return {...tokens, user};
+    },
+    onSuccess: (data) => {
+      // Keep the active mutation and its navigation callback mounted.
+      queryClient.removeQueries();
+      queryClient.setQueryData(["me"], data.user);
+      setUser(data.user);
+      setAuth(data.access, data.refresh);
+    },
   });
 }
 
@@ -20,7 +32,7 @@ export function useCurrentUser() {
     queryKey: ["me"],
     queryFn: async () => {
       const user = await authApi.me();
-      setUser(user);
+      if (useAuthStore.getState().accessToken === accessToken) setUser(user);
       return user;
     },
     enabled: !!accessToken,

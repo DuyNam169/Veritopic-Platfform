@@ -10,6 +10,7 @@ Groq hiện không cung cấp API embeddings. Vì vậy không được dùng ve
 embedding: hash không mang thông tin ngữ nghĩa và tạo ra kết quả gần như ngẫu nhiên.
 """
 import json
+import hashlib
 import math
 import logging
 import re
@@ -68,6 +69,32 @@ def _topic_text(topic) -> str:
         f"Lĩnh vực: {field_name}",
         f"Bộ môn: {department_name}",
     ]))
+
+
+def topic_embedding_text(topic) -> str:
+    # Do not let a shared department/field inflate semantic similarity.
+    title = (topic.title or "").strip()
+    description = (getattr(topic, "description", "") or "").strip()[:4000]
+    return f"{title}\n{description}" if description else title
+
+
+def topic_embedding_signature(topic) -> str:
+    payload = f"content-v1:{settings.SIMILARITY_EMBEDDING_MODEL}:{settings.SIMILARITY_EMBEDDING_MODE}\n{topic_embedding_text(topic)}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def refresh_topic_embeddings(topics, force=False):
+    from apps.topics.models import Topic
+
+    stale = [topic for topic in topics if force or topic.embedding is None
+             or getattr(topic, "embedding_signature", "") != topic_embedding_signature(topic)]
+    for start in range(0, len(stale), 16):
+        batch = stale[start:start + 16]
+        vectors = get_embeddings([topic_embedding_text(topic) for topic in batch])
+        for topic, vector in zip(batch, vectors, strict=True):
+            topic.embedding = vector
+            topic.embedding_signature = topic_embedding_signature(topic)
+        Topic.objects.bulk_update(batch, ["embedding", "embedding_signature"])
 
 
 def tfidf_prefilter(new_topic, topics: list, top_k: int | None = None) -> list[Candidate]:
@@ -253,13 +280,8 @@ Nếu chỉ có tên, chỉ nhận xét từ thông tin đã cung cấp, không 
 
 
 def classify_warning_level(similarity_percent: float) -> str:
-    if similarity_percent > settings.SIMILARITY_THRESHOLD_DUPLICATE:
-        return "duplicate"
-    if similarity_percent > settings.SIMILARITY_THRESHOLD_HIGH:
-        return "high"
-    if similarity_percent > settings.SIMILARITY_THRESHOLD_REVIEW:
-        return "review"
-    return "normal"
+    # Cosine is an uncalibrated ranking score, not a duplication probability.
+    return "review"
 
 
 
@@ -314,6 +336,13 @@ def get_embeddings(texts: list[str]) -> list[list[float]]:
         ) from exc
     except requests.exceptions.HTTPError as exc:
         response_status = exc.response.status_code if exc.response is not None else None
+        if response_status == 503:
+            try:
+                detail = exc.response.json().get("detail")
+            except (ValueError, AttributeError):
+                detail = None
+            if isinstance(detail, str) and detail.strip():
+                raise SimilarityServiceUnavailable(detail) from exc
         raise SimilarityServiceUnavailable(
             f"Dịch vụ PhoBERT trả về lỗi HTTP {response_status}. "
             "Kiểm tra trạng thái model/API rồi thử lại."
@@ -385,10 +414,11 @@ def assess_candidates(new_topic, candidates, embedding):
     missing = [c.topic for c in candidates
                if c.topic.embedding is None and normalize_text(c.topic.title) != normalized]
     if missing:
-        vectors = get_embeddings([topic.title for topic in missing])
+        vectors = get_embeddings([topic_embedding_text(topic) for topic in missing])
         for topic, vector in zip(missing, vectors):
             topic.embedding = vector
-            topic.save(update_fields=["embedding"])
+            topic.embedding_signature = topic_embedding_signature(topic)
+            topic.save(update_fields=["embedding", "embedding_signature"])
 
     enabled = settings.SIMILARITY_GROQ_ENABLED
     assessment_status = "disabled"
@@ -436,12 +466,14 @@ def find_similar_topics(new_topic, top_n=None, refresh_embedding=False, exclude_
     normalized = normalize_text(new_topic.title)
     if all(normalize_text(topic.title) == normalized for topic in topics):
         return assess_candidates(new_topic, [Candidate(topic, 1.0) for topic in topics], None)[:top_n]
+    refresh_topic_embeddings(topics)
     embedding = new_topic.embedding
-    if embedding is None or refresh_embedding:
-        embedding = get_embedding(new_topic.title)
+    if embedding is None or refresh_embedding or getattr(new_topic, "embedding_signature", "") != topic_embedding_signature(new_topic):
+        embedding = get_embedding(topic_embedding_text(new_topic))
         new_topic.embedding = embedding
+        new_topic.embedding_signature = topic_embedding_signature(new_topic)
         if new_topic.pk:
-            new_topic.save(update_fields=["embedding"])
+            new_topic.save(update_fields=["embedding", "embedding_signature"])
     top_k = max(top_n, settings.SIMILARITY_PREFILTER_TOP_K)
     candidates = retrieve_candidates(new_topic, topics, embedding, top_k, exclude_topic_id)
     results = assess_candidates(new_topic, candidates, embedding)

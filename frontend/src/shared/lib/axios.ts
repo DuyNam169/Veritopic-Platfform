@@ -11,50 +11,43 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
-  if (token) {
+  if (token && !config.headers.Authorization && !config.url?.startsWith("/auth/login/")) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-let isRefreshing = false;
-let pendingRequests: Array<() => void> = [];
+let refreshPromise: Promise<string> | null = null;
 
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      if (isRefreshing) {
-        return new Promise((resolve) => {
-          pendingRequests.push(() => resolve(api(originalRequest)));
-        });
-      }
-
-      isRefreshing = true;
-      const refreshToken = localStorage.getItem("refresh_token");
-
-      try {
-        const { data } = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/login/refresh/`, {
-          refresh: refreshToken,
-        });
-        localStorage.setItem("access_token", data.access);
-        pendingRequests.forEach((cb) => cb());
-        pendingRequests = [];
-        return api(originalRequest);
-      } catch (refreshError) {
+  response => response,
+  async error => {
+    const request = error.config;
+    const refresh = localStorage.getItem("refresh_token");
+    if (error.response?.status !== 401 || !request || request._retry || !refresh || request.url?.startsWith("/auth/login/")) {
+      return Promise.reject(error);
+    }
+    request._retry = true;
+    if (!refreshPromise) {
+      refreshPromise = axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/login/refresh/`, {refresh})
+        .then(({data}) => {
+          if (localStorage.getItem("refresh_token") !== refresh) throw new Error("Session changed");
+          localStorage.setItem("access_token", data.access);
+          return data.access as string;
+        })
+        .finally(() => { refreshPromise = null; });
+    }
+    try {
+      const token = await refreshPromise;
+      request.headers.Authorization = `Bearer ${token}`;
+      return api(request);
+    } catch (refreshError) {
+      if (localStorage.getItem("refresh_token") === refresh) {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         window.location.href = "/login";
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
+      return Promise.reject(refreshError);
     }
-
-    return Promise.reject(error);
-  }
+  },
 );

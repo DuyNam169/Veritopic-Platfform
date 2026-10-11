@@ -1,6 +1,6 @@
 import torch
 from transformers import AutoTokenizer
-from src.config import (MODEL_NAME, MAX_LENGTH)
+from src.config import (MODEL_MODE, MODEL_NAME, MAX_LENGTH)
 from src.preprocess import (normalize_text)
 from src.inference.model_loader import (get_model,get_device)
 # ============================================================
@@ -21,10 +21,13 @@ def encode_titles(titles: list[str]):
     model = get_model()
     device = get_device()
     texts = [normalize_text(title) for title in titles]
+    if MODEL_MODE == "sentence_embedding":
+        from pyvi.ViTokenizer import tokenize
+        texts = [tokenize(text) for text in texts]
     encoded = tokenizer(
         texts,
         max_length=MAX_LENGTH,
-        padding="max_length",
+        padding=True,
         truncation=True,
         return_tensors="pt"
     )

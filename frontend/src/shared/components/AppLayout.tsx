@@ -72,7 +72,7 @@ export default function AppLayout() {
         </p>
       </div>
       <nav className="space-y-1">
-        <NavLink to="/" end className={navLinkClass}>
+        <NavLink to={user?.role === "teacher" ? "/teacher" : "/"} end className={navLinkClass}>
           <LayoutDashboard className="w-4 h-4 shrink-0" />
           <span>Tổng quan đề tài</span>
         </NavLink>
@@ -88,6 +88,7 @@ export default function AppLayout() {
           <UserIcon className="w-4 h-4 shrink-0" />
           <span>Hồ sơ cá nhân</span>
         </NavLink>
+        {user?.role !== "teacher" && <NavLink to="/projects" className={navLinkClass}><ClipboardList className="w-4 h-4 shrink-0" /><span>{user?.role === "student" ? "Đồ án & báo cáo của tôi" : "Tiến độ đồ án"}</span></NavLink>}
 
         {user?.role === "teacher" && (
           <>
@@ -96,11 +97,6 @@ export default function AppLayout() {
                 Giảng viên
               </p>
             </div>
-            <NavLink to="/teacher" end className={navLinkClass}>
-              <LayoutDashboard className="w-4 h-4 shrink-0" />
-              <span>Tổng quan
-              </span>
-            </NavLink>
             <NavLink to="/teacher/topics" className={navLinkClass}>
               <BookOpen className="w-4 h-4 shrink-0" />
               <span>Đề tài của tôi</span>

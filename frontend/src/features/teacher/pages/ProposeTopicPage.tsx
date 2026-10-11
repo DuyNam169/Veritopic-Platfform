@@ -4,6 +4,7 @@ import { teacherApi } from "../api";
 import { SimilarityPanel } from "../components/SimilarityPanel";
 import type { SimilarTopicResult } from "../types";
 import { api } from "@/shared/lib/axios";
+import { useAuthStore } from "@/features/auth/store";
 
 export const ProposeTopicPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,7 +37,8 @@ export const ProposeTopicPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const DRAFT_KEY = "veritopic_propose_draft";
+  const user = useAuthStore(s => s.user);
+  const DRAFT_KEY = `veritopic_propose_draft_${user?.id}`;
 
   // Khôi phục bản nháp từ localStorage nếu có
   useEffect(() => {
@@ -81,7 +83,7 @@ export const ProposeTopicPage: React.FC = () => {
       setAcademicYears(ayList);
       setSemesters(semList);
 
-      if (depList.length > 0) setDepartmentId(depList[0].id);
+      if (depList.length > 0) setDepartmentId(user?.department ?? depList[0].id);
       if (cohortList.length > 0) setCohortId(cohortList[0].id);
       if (ayList.length > 0) setAcademicYearId(ayList[0].id);
       if (semList.length > 0) setSemesterId(semList[0].id);
@@ -89,6 +91,11 @@ export const ProposeTopicPage: React.FC = () => {
       setErrorMsg("Không thể tải danh mục đào tạo.");
     });
   }, []);
+
+  useEffect(() => {
+    const available = semesters.filter(s => s.academic_year === academicYearId);
+    if (!available.some(s => s.id === semesterId)) setSemesterId(available[0]?.id ?? "");
+  }, [academicYearId, semesters, semesterId]);
 
   const addKeyword = () => {
     const trimmed = keywordInput.trim();
@@ -376,7 +383,7 @@ export const ProposeTopicPage: React.FC = () => {
                 className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
                 required
               >
-                {semesters.map((s) => (
+                {semesters.filter(s => s.academic_year === academicYearId).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>

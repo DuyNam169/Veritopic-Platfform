@@ -44,3 +44,4 @@ Thumbs.db
 # ============ Log files (có thể chứa dữ liệu nhạy cảm) ============
 *.log
 logs/
+.backups/

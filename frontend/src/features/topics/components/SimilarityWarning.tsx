@@ -2,9 +2,9 @@ import type { SimilarTopicResult, WarningLevel } from "../types";
 
 const LABEL: Record<WarningLevel, string> = {
   normal: "Bình thường",
-  review: "Cần xem xét",
+  review: "Cần đối chiếu",
   high: "Tương đồng cao",
-  duplicate: "Có khả năng trùng đề tài",
+  duplicate: "Trùng tên đề tài",
 };
 
 const COLOR_CLASS: Record<WarningLevel, string> = {
@@ -25,8 +25,8 @@ export default function SimilarityWarning({ results }: { results: SimilarTopicRe
       {results.map((r) => (
         <li key={r.topic.id} className="flex items-center justify-between rounded-md border p-3">
           <span className="text-sm">{r.topic.title}</span>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${COLOR_CLASS[r.warning_level]}`}>
-            {r.similarity_percent}% — {LABEL[r.warning_level]}
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${COLOR_CLASS[r.assessment_status === "exact_match" ? "duplicate" : "review"]}`}>
+            {r.similarity_percent} / 100 — {LABEL[r.assessment_status === "exact_match" ? "duplicate" : "review"]}
           </span>
         </li>
       ))}

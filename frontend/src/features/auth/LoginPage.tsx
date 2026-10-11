@@ -6,6 +6,16 @@ import { User, Lock, Eye, EyeOff, Loader2, ArrowRight, ShieldCheck } from "@/sha
 import { useLogin } from "./hooks";
 import type { LoginPayload } from "./api";
 import { toast } from "@/shared/lib/toast";
+import axios from "axios";
+
+function loginErrorMessage(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    if (!error.response) return "Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.";
+    if (error.response.status === 401) return "Sai tên đăng nhập hoặc mật khẩu, hoặc tài khoản đã bị khóa.";
+    if (error.response.status >= 500) return "Máy chủ đang gặp lỗi. Vui lòng thử lại sau.";
+  }
+  return "Không thể hoàn tất đăng nhập. Vui lòng thử lại.";
+}
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,8 +33,8 @@ export default function LoginPage() {
         toast.success("Chào mừng bạn trở lại với Veritopic!", "Đăng nhập thành công");
         navigate("/");
       },
-      onError: () => {
-        toast.error("Sai tên đăng nhập hoặc mật khẩu. Vui lòng kiểm tra lại.", "Đăng nhập thất bại");
+      onError: (error) => {
+        toast.error(loginErrorMessage(error), "Đăng nhập thất bại");
       },
     });
 
@@ -144,7 +154,7 @@ export default function LoginPage() {
 
             {loginMutation.isError && (
               <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 font-medium animate-shake">
-                Sai tên đăng nhập hoặc mật khẩu. Vui lòng thử lại.
+                {loginErrorMessage(loginMutation.error)}
               </div>
             )}
 

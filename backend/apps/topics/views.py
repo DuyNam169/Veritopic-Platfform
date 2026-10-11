@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.permissions import IsAdmin, IsTeacher, IsTopicOwnerOrAdmin, ReadOnlyOrAdmin
+from apps.common.access import scope_assignments
 
 from .models import (
     Technology,
@@ -50,6 +51,48 @@ class TopicViewSet(viewsets.ModelViewSet):
     search_fields = ("title", "description")
     ordering_fields = ("created_at", "title")
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.role == "department_head":
+            qs = qs.filter(department_id=user.department_id) if user.department_id else qs.none()
+        if self.request.query_params.get("mine") in ("true", "1"):
+            qs = qs.filter(proposed_by=user)
+        return qs
+
+    @action(detail=False, methods=["post"], url_path="check-title", permission_classes=[IsTeacher])
+    def check_title(self, request):
+        from .services.similarity import is_exact_duplicate
+        title = str(request.data.get("title", "")).strip()
+        if not title:
+            raise ValidationError({"title": "Nhập tên đề tài."})
+        return Response({"title": title, "exact_duplicate": is_exact_duplicate(title, Topic.objects.values_list("title", flat=True))})
+
+    @action(detail=False, methods=["post"], url_path="check-similarity", permission_classes=[IsTeacher])
+    def check_draft(self, request):
+        serializer = SimilarityCheckRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        results = find_similar_topics(Topic(title=data.get("title", ""), description=data.get("description", "")), top_n=data["top_k"])
+        return Response([{**r, "topic": TopicSerializer(r["topic"]).data} for r in results])
+
+    @action(detail=True, methods=["post"], permission_classes=[IsTeacher])
+    @transaction.atomic
+    def resubmit(self, request, pk=None):
+        topic = self.get_object()
+        if topic.proposed_by_id != request.user.pk:
+            raise PermissionDenied("Chỉ được gửi lại đề tài của bạn.")
+        self._ensure_teacher_topic_is_editable(topic)
+        serializer = TopicSerializer(topic, data=request.data, partial=True, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        topic.status = Topic.Status.PENDING
+        topic.reviewed_by = None
+        topic.review_note = ""
+        topic.save(update_fields=["status", "reviewed_by", "review_note", "updated_at"])
+        refresh_similarity_results(topic)
+        return Response(TopicSerializer(topic).data)
+
     def get_serializer_class(self):
         if self.action == "create":
             return TopicCreateSerializer
@@ -58,7 +101,7 @@ class TopicViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ("update", "partial_update", "destroy"):
             return [IsAuthenticated(), IsTopicOwnerOrAdmin()]
-        if self.action == "assign":
+        if self.action in ("assign", "resubmit", "check_title", "check_draft"):
             return [IsTeacher()]
         if self.action == "refresh_similarity":
             return [IsAdmin()]
@@ -139,9 +182,9 @@ class TopicViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import PermissionDenied
 
             raise PermissionDenied("Chỉ Giảng viên mới được đề xuất đề tài mới.")
-        topic = serializer.save()
-        # Kiểm tra trùng tên, PhoBERT + TF-IDF; Groq tùy chọn đánh giá bổ sung
-        self._propose_result = propose_topic(topic, actor=self.request.user)
+        with transaction.atomic():
+            topic = serializer.save()
+            self._propose_result = propose_topic(topic, actor=self.request.user)
 
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
@@ -232,6 +275,7 @@ class TopicViewSet(viewsets.ModelViewSet):
             student_ids=serializer.validated_data["student_ids"],
             actor=request.user,
             note=serializer.validated_data.get("note", ""),
+            due_date=serializer.validated_data.get("due_date"),
         )
         return Response(TopicAssignmentSerializer(assignment).data, status=status.HTTP_201_CREATED)
 
@@ -240,19 +284,30 @@ class TopicAssignmentViewSet(viewsets.ReadOnlyModelViewSet):
     """/api/v1/topics/assignments/ — tra cứu các lượt giao đề tài."""
     queryset = TopicAssignment.objects.select_related(
         "topic", "topic__proposed_by", "assigned_by"
-    ).prefetch_related("students")
+    ).prefetch_related("students").order_by("-assigned_at", "-id")
     serializer_class = TopicAssignmentSerializer
     permission_classes = (IsAuthenticated,)
     filterset_fields = ("topic", "students")
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        user = self.request.user
-        if user.role == "student":
-            return qs.filter(students=user).distinct()
-        if user.role == "teacher":
-            return qs.filter(assigned_by=user)
-        return qs
+        return scope_assignments(super().get_queryset(), self.request.user)
+
+    @action(detail=True, methods=["patch"], url_path="update-status", permission_classes=[IsTeacher])
+    @transaction.atomic
+    def update_status(self, request, pk=None):
+        assignment = self.get_object()
+        from django.contrib.auth import get_user_model
+        list(get_user_model().objects.select_for_update().filter(pk__in=assignment.students.values_list("pk", flat=True)).order_by("pk"))
+        assignment = TopicAssignment.objects.select_for_update().get(pk=assignment.pk)
+        value = request.data.get("status")
+        if value not in TopicAssignment.Status.values:
+            raise ValidationError({"status": "Trạng thái không hợp lệ."})
+        if value == "active" and TopicAssignment.objects.filter(students__in=assignment.students.all(), topic__semester=assignment.topic.semester, status="active").exclude(pk=assignment.pk).exists():
+            raise ValidationError("Sinh viên đang thực hiện một đề tài khác trong học kỳ.")
+        assignment.status = value
+        assignment.save(update_fields=["status"])
+        TopicHistory.objects.create(topic=assignment.topic, actor=request.user, action="updated", note=f"Lượt giao #{assignment.pk}: {assignment.get_status_display()}")
+        return Response(self.get_serializer(assignment).data)
 
 
 class TopicResourcePermission(IsAuthenticated):
@@ -272,6 +327,13 @@ class TopicResourcePermission(IsAuthenticated):
 class TopicResourceViewSet(viewsets.ModelViewSet):
     permission_classes = (TopicResourcePermission,)
     filterset_fields = ("topic",)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.role == "department_head":
+            return qs.filter(topic__department_id=user.department_id) if user.department_id else qs.none()
+        return qs
 
     def perform_create(self, serializer):
         topic = serializer.validated_data["topic"]
@@ -356,6 +418,8 @@ class SimilarityCheckViewSet(viewsets.GenericViewSet):
                 source_topic = Topic.objects.get(pk=source_topic_id)
             except Topic.DoesNotExist as error:
                 raise NotFound("Không tìm thấy đề tài được chọn.") from error
+            if request.user.role == "department_head" and source_topic.department_id != request.user.department_id:
+                raise PermissionDenied("Đề tài không thuộc bộ môn phụ trách.")
             if not title:
                 title = source_topic.title
 
@@ -363,9 +427,12 @@ class SimilarityCheckViewSet(viewsets.GenericViewSet):
         if source_topic_id:
             query_topic = source_topic
             title_changed = query_topic.title != title
+            description_changed = "description" in data and query_topic.description != data["description"]
             query_topic.title = title
-            if title_changed:
-                # A custom title is a transient query; never overwrite the stored source vector.
+            if "description" in data:
+                query_topic.description = data["description"]
+            if title_changed or description_changed:
+                # A custom query must not overwrite the stored source vector.
                 query_topic.embedding = None
                 query_topic.pk = None
         else:
@@ -378,6 +445,7 @@ class SimilarityCheckViewSet(viewsets.GenericViewSet):
             level = result["warning_level"]
             results.append({
                 "topic_id": topic.pk, "title": topic.title, "topic_title": topic.title,
+                "description": topic.description,
                 "similarity": percent / 100, "percent": percent,
                 "similarity_percent": percent, "warning": level, "warning_level": level,
                 "groq_score": result["groq_score"],

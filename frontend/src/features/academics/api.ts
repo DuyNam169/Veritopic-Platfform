@@ -8,11 +8,14 @@ export const academicsApi = {
   fields: () => api.get("/academics/fields/").then((r) => r.data),
 };
 
-export type CatalogKind = "cohorts" | "academic-years" | "semesters" | "departments" | "fields";
+export type CatalogKind = "cohorts" | "academic-years" | "semesters" | "departments" | "fields" | "majors";
 export interface CatalogItem {
+  description?: string;
   id: number; name: string; start_year?: number; end_year?: number;
   is_current?: boolean; academic_year?: number; start_date?: string; end_date?: string;
   code?: string; head?: number | null; head_name?: string | null;
+  department?: number; department_name?: string; major?: number | null; major_name?: string | null;
+  semester_number?: number | null; is_active?: boolean;
 }
 export interface HeadOption { id: number; username: string; first_name: string; last_name: string; }
 async function allPages<T>(url: string, params: Record<string, string | number> = {}): Promise<T[]> {

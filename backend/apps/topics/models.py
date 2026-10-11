@@ -16,6 +16,14 @@ class Topic(models.Model):
 
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True)
+    keywords = models.JSONField(default=list, blank=True)
+    max_students = models.PositiveSmallIntegerField(default=5)
+    requirements = models.TextField(blank=True)
+    topic_code = models.CharField(max_length=50, blank=True, default="")
+    major = models.ForeignKey("academics.Major", on_delete=models.PROTECT, null=True, blank=True, related_name="topics")
+    project_type = models.CharField(max_length=50, blank=True)
+    architecture = models.CharField(max_length=100, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_topics")
 
     department = models.ForeignKey(
         "academics.Department", on_delete=models.PROTECT, related_name="topics"
@@ -50,12 +58,14 @@ class Topic(models.Model):
     # Vector embedding PhoBERT, lưu bằng pgvector để tra cứu lân cận nhanh.
     # NULL khi mới tạo, được tính bất đồng bộ/đồng bộ ngay sau khi save (xem services/similarity.py)
     embedding = VectorField(dimensions=EMBEDDING_DIM, null=True, blank=True)
+    embedding_signature = models.CharField(max_length=64, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["topic_code"], condition=~models.Q(topic_code=""), name="unique_topic_code_nonempty")]
         indexes = [
             models.Index(fields=["status"]),
             models.Index(fields=["cohort", "academic_year", "semester"]),
@@ -66,6 +76,13 @@ class Topic(models.Model):
 
 
 class TopicAssignment(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Đang thực hiện"
+        COMPLETED = "completed", "Đã hoàn thành"
+        CANCELLED = "cancelled", "Đã hủy"
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    due_date = models.DateField(null=True, blank=True)
     """Giao đề tài cho sinh viên hoặc nhóm sinh viên."""
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="assignments")
     students = models.ManyToManyField(

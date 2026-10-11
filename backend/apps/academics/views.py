@@ -5,13 +5,14 @@ from django.db.models.deletion import ProtectedError
 
 from apps.common.permissions import ReadOnlyOrAdmin
 
-from .models import AcademicYear, Cohort, Department, Field, Semester
+from .models import AcademicYear, Cohort, Department, Field, Major, Semester
 from .serializers import (
     AcademicYearSerializer,
     CohortSerializer,
     DepartmentSerializer,
     FieldSerializer,
     SemesterSerializer,
+    MajorSerializer,
 )
 
 
@@ -116,3 +117,10 @@ class FieldViewSet(CatalogViewSet):
     queryset = Field.objects.all()
     serializer_class = FieldSerializer
     permission_classes = (ReadOnlyOrAdmin,)
+
+
+class MajorViewSet(CatalogViewSet):
+    queryset = Major.objects.select_related("department").all()
+    serializer_class = MajorSerializer
+    filterset_fields = ("department",)
+    search_fields = ("name", "code")

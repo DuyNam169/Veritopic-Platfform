@@ -32,8 +32,26 @@ class User(AbstractUser):
         related_name="students",
         help_text="Khóa học của sinh viên",
     )
-    student_code = models.CharField(max_length=30, blank=True, help_text="Mã số sinh viên (nếu role=student)")
-    class_name = models.CharField(max_length=50, blank=True, help_text="Tên lớp (nếu role=student)")
+    student_code = models.CharField(max_length=50, blank=True, help_text="Mã số sinh viên (nếu role=student)")
+    class_name = models.CharField(max_length=100, blank=True, help_text="Tên lớp (nếu role=student)")
+    lecturer_code = models.CharField(max_length=50, blank=True, default="")
+    academic_degree = models.CharField(max_length=100, blank=True)
+    specialization = models.TextField(blank=True)
+    major = models.ForeignKey("academics.Major", on_delete=models.PROTECT, null=True, blank=True, related_name="users")
+    academic_year = models.ForeignKey("academics.AcademicYear", on_delete=models.PROTECT, null=True, blank=True, related_name="students")
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=20, blank=True)
+
+    class StudentStatus(models.TextChoices):
+        ACTIVE = "active", "Đang học"
+        GRADUATED = "graduated", "Đã tốt nghiệp"
+        SUSPENDED = "suspended", "Tạm ngừng học"
+        DROPPED_OUT = "dropped_out", "Đã thôi học"
+
+    student_status = models.CharField(max_length=30, choices=StudentStatus.choices, default=StudentStatus.ACTIVE)
+
+    class Meta(AbstractUser.Meta):
+        constraints = [models.UniqueConstraint(fields=["lecturer_code"], condition=~models.Q(lecturer_code=""), name="unique_lecturer_code_nonempty")]
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

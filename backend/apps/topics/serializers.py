@@ -2,6 +2,7 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from apps.accounts.serializers import UserSerializer
+from apps.common.validation import validate_academic_links, validate_optional_code
 
 from .models import (
     Technology,
@@ -16,7 +17,19 @@ from .models import (
 
 
 class TopicAcademicPeriodValidationMixin:
+    def validate_topic_code(self, value):
+        return validate_optional_code(Topic, "topic_code", value, self.instance)
+
     def validate(self, attrs):
+        validate_academic_links(attrs, self.instance)
+        request = self.context.get("request")
+        department = attrs.get("department", getattr(self.instance, "department", None))
+        if request and request.user.role == "teacher" and request.user.department_id and department and department.pk != request.user.department_id:
+            raise serializers.ValidationError({"department": "Chỉ được đề xuất đề tài trong bộ môn của bạn."})
+        if "max_students" in attrs and not 1 <= attrs["max_students"] <= 5:
+            raise serializers.ValidationError({"max_students": "Chọn từ 1 đến 5 sinh viên."})
+        if "keywords" in attrs and (not isinstance(attrs["keywords"], list) or any(not isinstance(item, str) for item in attrs["keywords"])):
+            raise serializers.ValidationError({"keywords": "Từ khóa phải là danh sách chuỗi."})
         academic_year = attrs.get(
             "academic_year", getattr(self.instance, "academic_year", None)
         )
@@ -40,13 +53,14 @@ class TopicSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSeria
     class Meta:
         model = Topic
         fields = (
-            "id", "title", "description", "department", "field", "cohort",
+            "id", "title", "description", "keywords", "max_students", "requirements", "department", "field", "cohort",
             "academic_year", "semester", "proposed_by", "proposed_by_detail",
             "department_name", "field_name", "cohort_name", "academic_year_name",
             "semester_name", "assignment_count",
+            "topic_code", "major", "project_type", "architecture", "created_by",
             "status", "reviewed_by", "review_note", "created_at", "updated_at",
         )
-        read_only_fields = ("status", "reviewed_by", "review_note", "created_at", "updated_at")
+        read_only_fields = ("proposed_by", "created_by", "status", "reviewed_by", "review_note", "created_at", "updated_at")
 
 
 class TopicCreateSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSerializer):
@@ -55,21 +69,24 @@ class TopicCreateSerializer(TopicAcademicPeriodValidationMixin, serializers.Mode
     class Meta:
         model = Topic
         fields = (
-            "id", "title", "description", "department", "field",
+            "id", "title", "description", "keywords", "max_students", "requirements", "department", "field",
             "cohort", "academic_year", "semester",
+            "topic_code", "major", "project_type", "architecture",
         )
 
     def create(self, validated_data):
         validated_data["proposed_by"] = self.context["request"].user
+        validated_data["created_by"] = self.context["request"].user
         return super().create(validated_data)
 
 
 class TopicSimilarityResultSerializer(serializers.ModelSerializer):
     similar_topic_title = serializers.CharField(source="similar_topic.title", read_only=True)
+    similar_topic_description = serializers.CharField(source="similar_topic.description", read_only=True)
 
     class Meta:
         model = TopicSimilarityResult
-        fields = ("id", "similar_topic", "similar_topic_title", "similarity_percent", "warning_level", "groq_score", "groq_explanation", "assessment_status", "created_at")
+        fields = ("id", "similar_topic", "similar_topic_title", "similar_topic_description", "similarity_percent", "warning_level", "groq_score", "groq_explanation", "assessment_status", "created_at")
 
 
 class TopicHistorySerializer(serializers.ModelSerializer):
@@ -94,7 +111,7 @@ class TopicAssignmentSerializer(serializers.ModelSerializer):
         model = TopicAssignment
         fields = (
             "id", "topic", "topic_title", "proposed_by_detail", "students",
-            "students_detail", "assigned_by", "assigned_at", "note",
+            "students_detail", "assigned_by", "assigned_at", "note", "status", "due_date",
         )
         read_only_fields = ("assigned_by", "assigned_at")
 
@@ -175,6 +192,7 @@ class ReviewActionSerializer(serializers.Serializer):
 
 
 class AssignTopicSerializer(serializers.Serializer):
+    due_date = serializers.DateField(required=False, allow_null=True)
     student_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
     note = serializers.CharField(required=False, allow_blank=True, default="")
 

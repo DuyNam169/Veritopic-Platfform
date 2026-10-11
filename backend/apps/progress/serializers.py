@@ -25,6 +25,7 @@ class ProgressFeedbackSerializer(serializers.ModelSerializer):
 
 
 class ProgressFeedbackCreateSerializer(serializers.ModelSerializer):
+    score = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
     class Meta:
         model = ProgressFeedback
         fields = ("comment", "score", "result")
@@ -54,6 +55,10 @@ class ProgressReportSerializer(serializers.ModelSerializer):
 
 
 class ProgressReportCreateSerializer(serializers.ModelSerializer):
+    def validate_attachment(self, file):
+        if file and (file.size > 20 * 1024 * 1024 or file.name.rsplit(".", 1)[-1].lower() not in {"pdf", "doc", "docx", "zip"}):
+            raise serializers.ValidationError("Chỉ hỗ trợ PDF, Word, ZIP tối đa 20 MB.")
+        return file
     class Meta:
         model = ProgressReport
         fields = ("period_label", "stage", "percent", "content", "attachment")

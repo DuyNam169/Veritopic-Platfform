@@ -115,12 +115,6 @@ export const MyTopicsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50">
-            Xuất Excel
-          </button>
-          <button className="rounded-full bg-[#006A60] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#00524a]">
-            Xuất PDF
-          </button>
           <Link
             to="/teacher/propose"
             className="rounded-full bg-[#006A60] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#00524a] inline-flex items-center gap-1"

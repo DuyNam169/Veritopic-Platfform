@@ -1,4 +1,6 @@
 from rest_framework.routers import DefaultRouter
+from django.urls import path
+from .teacher_views import AssignableStudentsView, MyStudentsView
 
 from .views import (
     SimilarityCheckViewSet,
@@ -19,4 +21,4 @@ router.register("topic-functions", TopicFunctionViewSet, basename="topic-functio
 router.register("topic-documents", TopicDocumentViewSet, basename="topic-document")
 router.register("similarity/checks", SimilarityCheckViewSet, basename="similarity-check")
 
-urlpatterns = router.urls
+urlpatterns = [path("assignable-students/", AssignableStudentsView.as_view()), path("my-students/", MyStudentsView.as_view())] + router.urls

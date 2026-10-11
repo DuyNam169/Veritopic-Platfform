@@ -33,19 +33,4 @@ def model_score_to_percent(
 def warning_level(
     percent
 ):
-
-    if percent < 50:
-
-        return "Bình thường"
-
-    elif percent < 70:
-
-        return "Cần xem xét"
-
-    elif percent < 85:
-
-        return "Tương đồng cao"
-
-    else:
-
-        return "Có khả năng trùng"
+    return "Cần đối chiếu"

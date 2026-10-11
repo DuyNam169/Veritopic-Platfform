@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import type { User } from "@/types";
+import { queryClient } from "@/shared/lib/queryClient";
 
 interface AuthState {
   accessToken: string | null;
@@ -26,6 +27,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   setUser: (user) => set({ user }),
   logout: () => {
+    queryClient.clear();
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     set({ accessToken: null, refreshToken: null, user: null });

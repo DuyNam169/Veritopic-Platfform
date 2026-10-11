@@ -3,8 +3,9 @@ from pydantic import BaseModel, Field
 from psycopg2 import Error as DatabaseError
 
 from src.inference.database import get_existing_titles
-from src.config import MODEL_PATH
+from src.config import MODEL_MODE, MODEL_NAME, MODEL_PATH
 from src.inference.embedding import encode_titles
+from src.inference.model_loader import get_model
 from src.inference.predict import rank_title_candidates
 
 
@@ -51,7 +52,15 @@ app = FastAPI(
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    try:
+        get_model()
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return {
+        "status": "ok",
+        "model_mode": MODEL_MODE,
+        "model_name": MODEL_PATH.name if MODEL_MODE == "checkpoint" else MODEL_NAME,
+    }
 
 
 @app.post(
@@ -99,7 +108,7 @@ def check_title(request: CheckTitleRequest):
     except FileNotFoundError as error:
         raise HTTPException(
             status_code=503,
-            detail="Không tìm thấy checkpoint model đã huấn luyện."
+            detail=str(error)
         ) from error
 
     return {
@@ -125,10 +134,10 @@ def encode_title_batch(request: EncodeTitlesRequest):
     except FileNotFoundError as error:
         raise HTTPException(
             status_code=503,
-            detail="Không tìm thấy checkpoint model đã huấn luyện.",
+            detail=str(error),
         ) from error
     return {
-        "model_name": MODEL_PATH.name,
+        "model_name": MODEL_PATH.name if MODEL_MODE == "checkpoint" else MODEL_NAME,
         "embeddings": embeddings,
     }
 

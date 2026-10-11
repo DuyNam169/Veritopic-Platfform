@@ -37,6 +37,7 @@ export interface TopicDocument {
 }
 
 export interface SimilarityCheckResult {
+  description?: string;
   groq_score?: number | null;
   groq_explanation?: string;
   assessment_status?: string;

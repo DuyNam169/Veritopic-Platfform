@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.permissions import IsTeacher
+from apps.common.access import scope_assignments
 from apps.topics.models import TopicAssignment
 from .models import ProgressReport
 from .serializers import (
@@ -31,15 +32,12 @@ class ProjectProgressViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == "teacher":
-            return TopicAssignment.objects.filter(topic__proposed_by=user).select_related(
-                "topic", "assigned_by"
-            ).prefetch_related("students", "reports")
-        elif user.role == "student":
-            return TopicAssignment.objects.filter(students=user).select_related(
-                "topic", "assigned_by"
-            ).prefetch_related("students", "reports")
-        return TopicAssignment.objects.all().select_related("topic", "assigned_by").prefetch_related("students", "reports")
+        return scope_assignments(TopicAssignment.objects.all(), user).select_related("topic", "assigned_by").prefetch_related("students", "reports").order_by("-assigned_at", "-id")
+
+    def retrieve(self, request, *args, **kwargs):
+        assignment = self.get_object()
+        from apps.topics.serializers import TopicAssignmentSerializer
+        return Response(TopicAssignmentSerializer(assignment).data)
 
     def list(self, request, *args, **kwargs):
         assignments = self.get_queryset()
@@ -84,11 +82,16 @@ class ProjectProgressViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(serializer.data)
 
         # POST: tạo báo cáo tiến độ
+        if request.user.role != "student" or not assignment.students.filter(pk=request.user.pk).exists():
+            raise PermissionDenied("Chỉ sinh viên trong nhóm mới được nộp báo cáo.")
+        if assignment.status != "active":
+            raise PermissionDenied("Đề tài đã kết thúc hoặc bị hủy.")
         serializer = ProgressReportCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         report = serializer.save(
             assignment=assignment,
             submitted_by=request.user,
+            is_late=check_is_assignment_late(assignment),
         )
         return Response(ProgressReportSerializer(report).data, status=status.HTTP_201_CREATED)
 
@@ -129,12 +132,7 @@ class DownloadAttachmentView(APIView):
         user = request.user
         assign = report.assignment
         # Kiểm tra quyền: Admin, GV hướng dẫn, hoặc SV nằm trong nhóm được giao
-        is_allowed = (
-            user.role == "admin"
-            or assign.topic.proposed_by == user
-            or assign.assigned_by == user
-            or assign.students.filter(pk=user.pk).exists()
-        )
+        is_allowed = scope_assignments(TopicAssignment.objects.filter(pk=assign.pk), user).exists()
         if not is_allowed:
             raise PermissionDenied("Bạn không có quyền tải file đính kèm của báo cáo này.")
 

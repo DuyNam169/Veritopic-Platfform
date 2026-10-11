@@ -321,6 +321,11 @@ class PeopleDirectoryTests(APITestCase):
             student_code="SV001",
         )
         self.url = reverse("management-people-list")
+        from apps.academics.models import Department
+        department = Department.objects.create(name="Directory department", code="DIR")
+        for user in (self.head, self.teacher, self.student):
+            user.department = department
+            user.save(update_fields=["department"])
 
     def test_admin_and_department_head_can_read_teacher_and_student_profiles(self):
         for manager in (self.admin, self.head):

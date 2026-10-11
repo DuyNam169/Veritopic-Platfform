@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/store";
-import TopicListPage from "@/features/topics/pages/TopicListPage";
+import ProjectsPage from "@/features/progress/ProjectsPage";
+import AdminOverviewPage from "@/features/statistics/pages/AdminOverviewPage";
 
 export default function HomeRedirect() {
   const role = useAuthStore((s) => s.user?.role);
@@ -8,9 +9,10 @@ export default function HomeRedirect() {
   if (role === "teacher") {
     return <Navigate to="/teacher" replace />;
   }
-  if (role === "department_head" || role === "admin") {
-    return <Navigate to="/approval" replace />;
+  if (role === "admin") return <AdminOverviewPage />;
+  if (role === "department_head") {
+    return <ProjectsPage overview />;
   }
 
-  return <TopicListPage />;
+  return <ProjectsPage overview />;
 }
