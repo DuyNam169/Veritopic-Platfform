@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from .models import Notification, AdvisorRequest
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from apps.common.validation import validate_academic_links, validate_optional_code
@@ -272,3 +273,70 @@ class ResetPasswordSerializer(serializers.Serializer):
         from django.contrib.auth.password_validation import validate_password
         validate_password(value)
         return value
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = (
+            "id", "recipient", "sender", "sender_name",
+            "title", "message", "notification_type", "link",
+            "is_read", "created_at"
+        )
+        read_only_fields = ("id", "recipient", "sender", "sender_name", "created_at")
+
+    def get_sender_name(self, obj):
+        if obj.sender:
+            return obj.sender.get_full_name() or obj.sender.username
+        return "Hệ thống"
+
+
+class AdvisorRequestSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    student_code = serializers.CharField(source="student.student_code", read_only=True)
+    student_email = serializers.EmailField(source="student.email", read_only=True)
+    class_name = serializers.CharField(source="student.class_name", read_only=True)
+    cohort_name = serializers.CharField(source="student.cohort.name", read_only=True, allow_null=True)
+    department_name = serializers.CharField(source="student.department.name", read_only=True, allow_null=True)
+    teacher_name = serializers.SerializerMethodField()
+    teacher_email = serializers.EmailField(source="teacher.email", read_only=True)
+    teacher_degree = serializers.CharField(source="teacher.academic_degree", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = AdvisorRequest
+        fields = (
+            "id", "student", "student_name", "student_code", "student_email",
+            "class_name", "cohort_name", "department_name",
+            "teacher", "teacher_name", "teacher_email", "teacher_degree",
+            "status", "status_display", "message", "response_note",
+            "created_at", "updated_at"
+        )
+        read_only_fields = (
+            "id", "student", "status", "created_at", "updated_at"
+        )
+
+    def get_student_name(self, obj):
+        return obj.student.get_full_name() or obj.student.username
+
+    def get_teacher_name(self, obj):
+        return obj.teacher.get_full_name() or obj.teacher.username
+
+
+class AdvisorRequestCreateSerializer(serializers.Serializer):
+    teacher_id = serializers.IntegerField()
+    message = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate_teacher_id(self, value):
+        try:
+            teacher = User.objects.get(pk=value, role="teacher")
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Giảng viên không tồn tại hoặc không hợp lệ.")
+        return value
+
+
+class AdvisorRequestRespondSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["accept", "reject"])
+    response_note = serializers.CharField(required=False, allow_blank=True, default="")

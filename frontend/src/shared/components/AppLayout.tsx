@@ -16,10 +16,13 @@ import {
   PlusCircle,
   GraduationCap,
   Search,
+  Bell,
+  UserCheck,
 } from "./icons";
 
 import { useAuthStore } from "@/features/auth/store";
 import { toast } from "@/shared/lib/toast";
+import { NotificationDropdown } from "@/features/student/components/NotificationDropdown";
 
 const roleLabels = {
   admin: "Quản trị viên",
@@ -68,90 +71,134 @@ export default function AppLayout() {
     <>
       <div className="px-3 mb-2">
         <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-slate-500">
-          Điều hướng
+          {user?.role === "student" ? "Sinh viên" : "Điều hướng"}
         </p>
       </div>
       <nav className="space-y-1">
-        <NavLink to={user?.role === "teacher" ? "/teacher" : "/"} end className={navLinkClass}>
-          <LayoutDashboard className="w-4 h-4 shrink-0" />
-          <span>Tổng quan đề tài</span>
-        </NavLink>
-        <NavLink to="/topics" className={navLinkClass}>
-          <BookOpen className="w-4 h-4 shrink-0" />
-          <span>Danh mục đề tài</span>
-        </NavLink>
-        {user?.role !== "student" && <NavLink to="/topics/similarity" className={navLinkClass}>
-          <Search className="w-4 h-4 shrink-0" />
-          <span>Kiểm tra tương đồng</span>
-        </NavLink>}
-        <NavLink to="/profile" className={navLinkClass}>
-          <UserIcon className="w-4 h-4 shrink-0" />
-          <span>Hồ sơ cá nhân</span>
-        </NavLink>
-        {user?.role !== "teacher" && <NavLink to="/projects" className={navLinkClass}><ClipboardList className="w-4 h-4 shrink-0" /><span>{user?.role === "student" ? "Đồ án & báo cáo của tôi" : "Tiến độ đồ án"}</span></NavLink>}
-
-        {user?.role === "teacher" && (
+        {user?.role === "student" ? (
           <>
-            <div className="pt-4 pb-2 px-3">
-              <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-slate-500">
-                Giảng viên
-              </p>
-            </div>
-            <NavLink to="/teacher/topics" className={navLinkClass}>
-              <BookOpen className="w-4 h-4 shrink-0" />
-              <span>Đề tài của tôi</span>
+            <NavLink to="/" end className={navLinkClass}>
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span>Tổng quan đồ án</span>
             </NavLink>
-            <NavLink to="/teacher/propose" className={navLinkClass}>
+            <NavLink to="/student/advisor" className={navLinkClass}>
+              <UserCheck className="w-4 h-4 shrink-0" />
+              <span>Chọn GVHD</span>
+            </NavLink>
+            <NavLink to="/student/propose" className={navLinkClass}>
               <PlusCircle className="w-4 h-4 shrink-0" />
               <span>Đề xuất đề tài</span>
             </NavLink>
-            <NavLink to="/teacher/students" className={navLinkClass}>
-              <GraduationCap className="w-4 h-4 shrink-0" />
-              <span>Sinh viên hướng dẫn</span>
+            <NavLink to="/topics" className={navLinkClass}>
+              <BookOpen className="w-4 h-4 shrink-0" />
+              <span>Danh mục đề tài</span>
             </NavLink>
-            <NavLink to="/teacher/progress" className={navLinkClass}>
+            <NavLink to="/projects" className={navLinkClass}>
               <ClipboardList className="w-4 h-4 shrink-0" />
-              <span>Tiến độ đồ án</span>
+              <span>Đồ án & báo cáo</span>
+            </NavLink>
+            <NavLink to="/notifications" className={navLinkClass}>
+              <Bell className="w-4 h-4 shrink-0" />
+              <span>Thông báo</span>
+            </NavLink>
+            <NavLink to="/profile" className={navLinkClass}>
+              <UserIcon className="w-4 h-4 shrink-0" />
+              <span>Hồ sơ cá nhân</span>
             </NavLink>
           </>
-        )}
-
-        {(user?.role === "admin" || user?.role === "department_head") && (
+        ) : (
           <>
-            <NavLink to="/approval" className={navLinkClass}>
-              <CheckSquare className="w-4 h-4 shrink-0" />
-              <span>Duyệt đề tài</span>
+            <NavLink to={user?.role === "teacher" ? "/teacher" : "/"} end className={navLinkClass}>
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span>Tổng quan đề tài</span>
             </NavLink>
-            <NavLink to="/people" className={navLinkClass}>
-              <Users className="w-4 h-4 shrink-0" />
-              <span>Giảng viên & sinh viên</span>
+            <NavLink to="/topics" className={navLinkClass}>
+              <BookOpen className="w-4 h-4 shrink-0" />
+              <span>Danh mục đề tài</span>
             </NavLink>
-          </>
-        )}
+            <NavLink to="/topics/similarity" className={navLinkClass}>
+              <Search className="w-4 h-4 shrink-0" />
+              <span>Kiểm tra tương đồng</span>
+            </NavLink>
+            <NavLink to="/profile" className={navLinkClass}>
+              <UserIcon className="w-4 h-4 shrink-0" />
+              <span>Hồ sơ cá nhân</span>
+            </NavLink>
+            {user?.role !== "teacher" && (
+              <NavLink to="/projects" className={navLinkClass}>
+                <ClipboardList className="w-4 h-4 shrink-0" />
+                <span>Tiến độ đồ án</span>
+              </NavLink>
+            )}
 
-        {user?.role === "admin" && (
-          <>
-            <div className="pt-6 pb-2 px-3">
-              <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-slate-500">
-                Quản trị hệ thống
-              </p>
-            </div>
-            <NavLink to="/users" className={navLinkClass}>
-              <Users className="w-4 h-4 shrink-0" />
-              <span>Quản lý tài khoản</span>
-            </NavLink>
-            <NavLink to="/academics" className={navLinkClass}>
-              <Layers className="w-4 h-4 shrink-0" />
-              <span>Danh mục hệ thống</span>
-            </NavLink>
-            <NavLink to="/technologies" className={navLinkClass}>
-              <Layers className="w-4 h-4 shrink-0" />
-              <span>Danh mục công nghệ</span>
-            </NavLink>
-            <NavLink to="/statistics" className={navLinkClass}>
-              <BarChart3 className="w-4 h-4 shrink-0" />
-              <span>Thống kê & báo cáo</span>
-            </NavLink>
+            {user?.role === "teacher" && (
+              <>
+                <div className="pt-4 pb-2 px-3">
+                  <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-slate-500">
+                    Giảng viên
+                  </p>
+                </div>
+                <NavLink to="/teacher/topics" className={navLinkClass}>
+                  <BookOpen className="w-4 h-4 shrink-0" />
+                  <span>Đề tài của tôi</span>
+                </NavLink>
+                <NavLink to="/teacher/propose" className={navLinkClass}>
+                  <PlusCircle className="w-4 h-4 shrink-0" />
+                  <span>Đề xuất đề tài</span>
+                </NavLink>
+                <NavLink to="/teacher/students" className={navLinkClass}>
+                  <GraduationCap className="w-4 h-4 shrink-0" />
+                  <span>Sinh viên hướng dẫn</span>
+                </NavLink>
+                <NavLink to="/teacher/student-requests" className={navLinkClass}>
+                  <UserCheck className="w-4 h-4 shrink-0" />
+                  <span>Yêu cầu từ SV</span>
+                </NavLink>
+                <NavLink to="/teacher/progress" className={navLinkClass}>
+                  <ClipboardList className="w-4 h-4 shrink-0" />
+                  <span>Tiến độ đồ án</span>
+                </NavLink>
+              </>
+            )}
+
+            {(user?.role === "admin" || user?.role === "department_head") && (
+              <>
+                <NavLink to="/approval" className={navLinkClass}>
+                  <CheckSquare className="w-4 h-4 shrink-0" />
+                  <span>Duyệt đề tài</span>
+                </NavLink>
+                <NavLink to="/people" className={navLinkClass}>
+                  <Users className="w-4 h-4 shrink-0" />
+                  <span>Giảng viên & sinh viên</span>
+                </NavLink>
+              </>
+            )}
+
+            {user?.role === "admin" && (
+              <>
+                <div className="pt-6 pb-2 px-3">
+                  <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-slate-500">
+                    Quản trị hệ thống
+                  </p>
+                </div>
+                <NavLink to="/users" className={navLinkClass}>
+                  <Users className="w-4 h-4 shrink-0" />
+                  <span>Quản lý tài khoản</span>
+                </NavLink>
+                <NavLink to="/academics" className={navLinkClass}>
+                  <Layers className="w-4 h-4 shrink-0" />
+                  <span>Danh mục hệ thống</span>
+                </NavLink>
+                <NavLink to="/technologies" className={navLinkClass}>
+                  <Layers className="w-4 h-4 shrink-0" />
+                  <span>Danh mục công nghệ</span>
+                </NavLink>
+                <NavLink to="/statistics" className={navLinkClass}>
+                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  <span>Thống kê & báo cáo</span>
+                </NavLink>
+              </>
+            )}
           </>
         )}
       </nav>
@@ -190,6 +237,8 @@ export default function AppLayout() {
 
         {/* User Info & Actions */}
         <div className="flex items-center gap-3 sm:gap-4">
+          <NotificationDropdown />
+
           <Link
             to="/profile"
             className="flex items-center gap-3 p-1.5 rounded-lg hover:bg-brand-50 transition group"

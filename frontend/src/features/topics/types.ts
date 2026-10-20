@@ -20,6 +20,8 @@ export interface Topic {
   academic_year_name: string;
   semester_name: string;
   assignment_count: number;
+  can_register?: boolean;
+  has_my_cohort_registered?: boolean;
   status: TopicStatus;
   reviewed_by: number | null;
   review_note: string;

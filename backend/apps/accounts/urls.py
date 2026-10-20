@@ -1,6 +1,9 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from .advisor_views import AdvisorRequestViewSet
+from .notification_views import NotificationViewSet
 from .views import (
     AvatarDeleteView,
     ChangePasswordView,
@@ -12,6 +15,10 @@ from .views import (
     ResetPasswordView,
 )
 
+router = DefaultRouter()
+router.register("notifications", NotificationViewSet, basename="notification")
+router.register("advisor-requests", AdvisorRequestViewSet, basename="advisor-request")
+
 urlpatterns = [
     path("login/", LoginView.as_view(), name="auth-login"),
     path("login/refresh/", TokenRefreshView.as_view(), name="auth-login-refresh"),
@@ -22,4 +29,4 @@ urlpatterns = [
     path("change-password/", ChangePasswordView.as_view(), name="auth-change-password"),
     path("forgot-password/", ForgotPasswordView.as_view(), name="auth-forgot-password"),
     path("reset-password/", ResetPasswordView.as_view(), name="auth-reset-password"),
-]
+] + router.urls

@@ -246,3 +246,121 @@ class TopicDocument(models.Model):
 
     def __str__(self):
         return self.file_name
+
+
+class StudentTopicProposal(models.Model):
+    """
+    Sinh viên đề xuất đề tài mới lên cho Giảng viên hướng dẫn.
+    Đề xuất ở trạng thái chờ GVHD xử lý (Đồng ý / Từ chối / Yêu cầu sửa).
+    Khi GVHD đồng ý, một Topic chính thức và TopicAssignment sẽ được khởi tạo.
+    """
+    class Status(models.TextChoices):
+        PENDING = "pending", "Chờ GVHD xử lý"
+        APPROVED = "approved", "GVHD đã đồng ý"
+        REJECTED = "rejected", "GVHD từ chối"
+        REVISION_REQUESTED = "revision_requested", "Yêu cầu chỉnh sửa"
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="student_topic_proposals",
+        limit_choices_to={"role": "student"},
+    )
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_topic_proposals",
+        limit_choices_to={"role": "teacher"},
+    )
+    title = models.CharField(max_length=500)
+    description = models.TextField(blank=True)
+    expected_technologies = models.CharField(max_length=255, blank=True, help_text="Công nghệ dự kiến")
+    department = models.ForeignKey(
+        "academics.Department",
+        on_delete=models.PROTECT,
+        related_name="student_proposals",
+    )
+    field = models.ForeignKey(
+        "academics.Field",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="student_proposals",
+    )
+    cohort = models.ForeignKey(
+        "academics.Cohort",
+        on_delete=models.PROTECT,
+        related_name="student_proposals",
+    )
+    academic_year = models.ForeignKey(
+        "academics.AcademicYear",
+        on_delete=models.PROTECT,
+        related_name="student_proposals",
+    )
+    semester = models.ForeignKey(
+        "academics.Semester",
+        on_delete=models.PROTECT,
+        related_name="student_proposals",
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    teacher_note = models.TextField(blank=True, help_text="Phản hồi/nhận xét của GVHD")
+    created_topic = models.ForeignKey(
+        Topic,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="from_student_proposal",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Proposal: {self.title} by {self.student_id} ({self.status})"
+
+
+class TopicRegistration(models.Model):
+    """
+    Sinh viên đăng ký (chọn) một đề tài có sẵn từ ngân hàng đề tài.
+    Ràng buộc: 
+    - 1 sinh viên chỉ được chọn 1 đề tài.
+    - Không sinh viên nào cùng khóa chọn chung 1 đề tài.
+    """
+    class Status(models.TextChoices):
+        PENDING = "pending", "Chờ duyệt"
+        APPROVED = "approved", "Đã duyệt"
+        REJECTED = "rejected", "Từ chối"
+        CANCELLED = "cancelled", "Đã hủy"
+
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.CASCADE,
+        related_name="registrations",
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="topic_registrations",
+        limit_choices_to={"role": "student"},
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    note = models.TextField(blank=True, help_text="Ghi chú nguyện vọng của sinh viên khi đăng ký")
+    teacher_note = models.TextField(blank=True, help_text="Phản hồi của giảng viên")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Registration: {self.student_id} -> Topic #{self.topic_id} ({self.status})"

@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    StudentTopicProposal,
     Technology,
     Topic,
     TopicAssignment,
@@ -8,6 +9,7 @@ from .models import (
     TopicDocument,
     TopicFunction,
     TopicHistory,
+    TopicRegistration,
     TopicSimilarityResult,
     TopicTechnology,
 )
@@ -21,3 +23,5 @@ admin.site.register(Technology)
 admin.site.register(TopicTechnology)
 admin.site.register(TopicFunction)
 admin.site.register(TopicDocument)
+admin.site.register(StudentTopicProposal)
+admin.site.register(TopicRegistration)
