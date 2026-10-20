@@ -13,6 +13,8 @@ from .models import (
     TopicHistory,
     TopicSimilarityResult,
     TopicTechnology,
+    StudentTopicProposal,
+    TopicRegistration,
 )
 
 
@@ -49,6 +51,33 @@ class TopicSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSeria
     academic_year_name = serializers.CharField(source="academic_year.name", read_only=True)
     semester_name = serializers.CharField(source="semester.name", read_only=True)
     assignment_count = serializers.IntegerField(source="assignments.count", read_only=True)
+    can_register = serializers.SerializerMethodField()
+    has_my_cohort_registered = serializers.SerializerMethodField()
+
+    def get_has_my_cohort_registered(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated or request.user.role != "student" or not request.user.cohort_id:
+            return False
+        if obj.assignments.filter(status="active", students__cohort_id=request.user.cohort_id).exists():
+            return True
+        if obj.registrations.filter(status__in=["pending", "approved"], student__cohort_id=request.user.cohort_id).exists():
+            return True
+        return False
+
+    def get_can_register(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated or request.user.role != "student":
+            return False
+        if obj.status != Topic.Status.APPROVED:
+            return False
+        from .models import TopicAssignment, TopicRegistration
+        if TopicAssignment.objects.filter(students=request.user, status="active").exists():
+            return False
+        if TopicRegistration.objects.filter(student=request.user, status__in=["pending", "approved"]).exists():
+            return False
+        if self.get_has_my_cohort_registered(obj):
+            return False
+        return True
 
     class Meta:
         model = Topic
@@ -56,7 +85,7 @@ class TopicSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSeria
             "id", "title", "description", "keywords", "max_students", "requirements", "department", "field", "cohort",
             "academic_year", "semester", "proposed_by", "proposed_by_detail",
             "department_name", "field_name", "cohort_name", "academic_year_name",
-            "semester_name", "assignment_count",
+            "semester_name", "assignment_count", "can_register", "has_my_cohort_registered",
             "topic_code", "major", "project_type", "architecture", "created_by",
             "status", "reviewed_by", "review_note", "created_at", "updated_at",
         )
@@ -209,3 +238,108 @@ class SimilarityCheckRequestSerializer(serializers.Serializer):
                 "title": "Nhập tên đề tài hoặc chọn một đề tài trong hệ thống."
             })
         return attrs
+
+
+class StudentTopicProposalSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    student_code = serializers.CharField(source="student.student_code", read_only=True)
+    student_email = serializers.EmailField(source="student.email", read_only=True)
+    class_name = serializers.CharField(source="student.class_name", read_only=True)
+    teacher_name = serializers.SerializerMethodField()
+    teacher_email = serializers.EmailField(source="teacher.email", read_only=True)
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    field_name = serializers.CharField(source="field.name", read_only=True, allow_null=True)
+    cohort_name = serializers.CharField(source="cohort.name", read_only=True)
+    academic_year_name = serializers.CharField(source="academic_year.name", read_only=True)
+    semester_name = serializers.CharField(source="semester.name", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = StudentTopicProposal
+        fields = (
+            "id", "student", "student_name", "student_code", "student_email", "class_name",
+            "teacher", "teacher_name", "teacher_email",
+            "title", "description", "expected_technologies",
+            "department", "department_name", "field", "field_name",
+            "cohort", "cohort_name", "academic_year", "academic_year_name",
+            "semester", "semester_name", "status", "status_display",
+            "teacher_note", "created_topic", "created_at", "updated_at",
+        )
+        read_only_fields = ("id", "student", "status", "created_topic", "created_at", "updated_at")
+
+    def get_student_name(self, obj):
+        return obj.student.get_full_name() or obj.student.username
+
+    def get_teacher_name(self, obj):
+        return obj.teacher.get_full_name() or obj.teacher.username
+
+
+class StudentTopicProposalCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentTopicProposal
+        fields = (
+            "teacher", "title", "description", "expected_technologies",
+            "department", "field", "cohort", "academic_year", "semester",
+        )
+
+    def validate_teacher(self, value):
+        if value.role != "teacher":
+            raise serializers.ValidationError("Người được chọn phải là giảng viên.")
+        return value
+
+    def validate_title(self, value):
+        val = value.strip()
+        if not val:
+            raise serializers.ValidationError("Tên đề tài không được để trống.")
+        return val
+
+
+class StudentTopicProposalRespondSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["approve", "reject", "revision_requested"])
+    teacher_note = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class TopicRegistrationSerializer(serializers.ModelSerializer):
+    topic_title = serializers.CharField(source="topic.title", read_only=True)
+    topic_code = serializers.CharField(source="topic.topic_code", read_only=True)
+    topic_cohort_name = serializers.CharField(source="topic.cohort.name", read_only=True)
+    topic_teacher_name = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+    student_code = serializers.CharField(source="student.student_code", read_only=True)
+    student_cohort_name = serializers.CharField(source="student.cohort.name", read_only=True, allow_null=True)
+    class_name = serializers.CharField(source="student.class_name", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = TopicRegistration
+        fields = (
+            "id", "topic", "topic_title", "topic_code", "topic_cohort_name", "topic_teacher_name",
+            "student", "student_name", "student_code", "student_cohort_name", "class_name",
+            "status", "status_display", "note", "teacher_note", "created_at", "updated_at",
+        )
+        read_only_fields = ("id", "student", "status", "created_at", "updated_at")
+
+    def get_topic_teacher_name(self, obj):
+        return obj.topic.proposed_by.get_full_name() or obj.topic.proposed_by.username
+
+    def get_student_name(self, obj):
+        return obj.student.get_full_name() or obj.student.username
+
+
+class TopicRegistrationCreateSerializer(serializers.Serializer):
+    topic_id = serializers.IntegerField()
+    note = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate_topic_id(self, value):
+        try:
+            topic = Topic.objects.get(pk=value)
+        except Topic.DoesNotExist:
+            raise serializers.ValidationError("Đề tài không tồn tại.")
+        if topic.status != Topic.Status.APPROVED:
+            raise serializers.ValidationError("Chỉ có thể đăng ký đề tài đã được phê duyệt.")
+        return value
+
+
+class TopicRegistrationRespondSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["approve", "reject"])
+    teacher_note = serializers.CharField(required=False, allow_blank=True, default="")

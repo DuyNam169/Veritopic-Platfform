@@ -9,8 +9,13 @@ export interface User {
   avatar: string | null;
   role: Role;
   department: number | null;
+  department_name?: string | null;
   cohort: number | null;
+  cohort_name?: string | null;
   student_code: string;
+  class_name?: string;
+  academic_degree?: string;
+  specialization?: string;
   phone_number?: string;
   created_at?: string;
   last_login?: string | null;

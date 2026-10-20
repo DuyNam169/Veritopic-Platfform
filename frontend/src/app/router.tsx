@@ -24,6 +24,12 @@ import { EditResubmitPage } from "@/features/teacher/pages/EditResubmitPage";
 import { MyStudentsPage } from "@/features/teacher/pages/MyStudentsPage";
 import { ProgressListPage } from "@/features/teacher/pages/ProgressListPage";
 import { ProgressDetailPage } from "@/features/teacher/pages/ProgressDetailPage";
+import { StudentRequestsPage } from "@/features/teacher/pages/StudentRequestsPage";
+
+// Student pages
+import { StudentAdvisorPage } from "@/features/student/pages/StudentAdvisorPage";
+import { StudentProposeTopicPage } from "@/features/student/pages/StudentProposeTopicPage";
+import { NotificationsPage } from "@/features/student/pages/NotificationsPage";
 
 import PeopleDirectoryPage from "@/features/people/pages/PeopleDirectoryPage";
 import SimilarityCheckPage from "@/features/topics/pages/SimilarityCheckPage";
@@ -54,8 +60,17 @@ export const router = createBrowserRouter([
             children: [{ path: "/topics/similarity", element: <SimilarityCheckPage /> }],
           },
           { path: "/profile", element: <ProfilePage /> },
+          { path: "/notifications", element: <NotificationsPage /> },
           { path: "/projects", element: <ProjectsPage /> },
           { path: "/projects/:assignmentId", element: <ProjectDetailPage /> },
+          // ---- Student-only routes ----
+          {
+            element: <RoleGuard allow={["student"]} />,
+            children: [
+              { path: "/student/advisor", element: <StudentAdvisorPage /> },
+              { path: "/student/propose", element: <StudentProposeTopicPage /> },
+            ],
+          },
           {
             element: <RoleGuard allow={["admin", "department_head"]} />,
             children: [
@@ -84,6 +99,7 @@ export const router = createBrowserRouter([
               { path: "/teacher/topics", element: <MyTopicsPage /> },
               { path: "/teacher/topics/:id/edit", element: <EditResubmitPage /> },
               { path: "/teacher/students", element: <MyStudentsPage /> },
+              { path: "/teacher/student-requests", element: <StudentRequestsPage /> },
               { path: "/teacher/progress", element: <ProgressListPage /> },
               { path: "/teacher/progress/:assignmentId", element: <ProgressDetailPage /> },
             ],

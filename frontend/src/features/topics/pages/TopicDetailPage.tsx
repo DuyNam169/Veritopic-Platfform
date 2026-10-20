@@ -5,6 +5,7 @@ import axios from "axios";
 
 import { catalogApi } from "@/features/academics/api";
 import { useAuthStore } from "@/features/auth/store";
+import { studentApi } from "@/features/student/api";
 import { Button, ErrorState, PageSkeleton, Panel, fieldClass } from "@/shared/components/ui";
 import { toast } from "@/shared/lib/toast";
 import { topicsApi } from "../api";
@@ -51,6 +52,23 @@ export default function TopicDetailPage() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("");
+  const isStudent = user?.role === "student";
+  const [registerModal, setRegisterModal] = useState(false);
+  const [registerNote, setRegisterNote] = useState("");
+
+  const registerMutation = useMutation({
+    mutationFn: () => studentApi.createTopicRegistration({ topic_id: topicId, note: registerNote }),
+    onSuccess: () => {
+      toast.success("Đã gửi yêu cầu đăng ký đề tài tới Giảng viên hướng dẫn!");
+      setRegisterModal(false);
+      setRegisterNote("");
+      void client.invalidateQueries({ queryKey: ["topics", topicId] });
+      void client.invalidateQueries({ queryKey: ["my-topic-status"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.detail || "Đăng ký đề tài thất bại.");
+    },
+  });
 
   const detail = useTopicDetail(topicId);
   const history = useTopicHistory(topicId);
@@ -123,6 +141,40 @@ export default function TopicDetailPage() {
 
       {topic.review_note && <section className="rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-semibold text-amber-900">Phản hồi duyệt</h2><p className="mt-1 text-sm text-amber-800">{topic.review_note}</p></section>}
 
+      {isStudent && (
+        <Panel className="border-teal-200 bg-teal-50/40">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#006A60] bg-teal-100 px-2 py-0.5 rounded">
+                Dành cho sinh viên · Khóa {user?.cohort_name || "của bạn"}
+              </span>
+              <h3 className="font-bold text-slate-900 text-base mt-1">Đăng ký thực hiện đề tài này</h3>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Quy chế: Mỗi sinh viên chỉ được chọn 1 đề tài đồ án và không sinh viên nào cùng khóa được chọn chung 1 đề tài.
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              {topic.status !== "approved" ? (
+                <span className="text-xs text-slate-500 font-medium">Đề tài chưa được duyệt, chưa mở đăng ký.</span>
+              ) : topic.has_my_cohort_registered ? (
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  ⚠️ Đã có sinh viên cùng khóa chọn đề tài này
+                </span>
+              ) : topic.can_register ? (
+                <Button variant="primary" onClick={() => setRegisterModal(true)}>
+                  Đăng ký đề tài này
+                </Button>
+              ) : (
+                <span className="text-xs text-slate-500 font-medium">
+                  Bạn đã có một đề tài đồ án hoặc đang chờ duyệt yêu cầu khác.
+                </span>
+              )}
+            </div>
+          </div>
+        </Panel>
+      )}
+
       <TopicResourcesPanel
         topicId={topic.id}
         canEdit={isAdmin || (user?.role === "teacher" && user.id === topic.proposed_by)}
@@ -150,6 +202,49 @@ export default function TopicDetailPage() {
         {highRiskDelete && <label className="mt-4 block text-sm font-medium text-slate-800">Nhập chính xác tên đề tài để xác nhận<input value={confirmTitle} onChange={(event) => setConfirmTitle(event.target.value)} className={fieldClass} /></label>}
         <div className="mt-6 flex justify-end gap-3"><Button disabled={remove.isPending} onClick={() => setDeleting(false)}>Hủy</Button><Button variant="danger" busy={remove.isPending} disabled={!canConfirmDelete} onClick={() => remove.mutate()}>Xóa vĩnh viễn</Button></div>
       </div></div>}
+
+      {registerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-scale-in space-y-4">
+            <h3 className="font-bold text-slate-900 text-base">Xác nhận đăng ký đề tài đồ án</h3>
+            <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+              <p>
+                <strong>Đề tài:</strong> {topic.title}
+              </p>
+              <p>
+                <strong>Khóa học:</strong> {topic.cohort_name} · <strong>Bộ môn:</strong> {topic.department_name}
+              </p>
+              <p>
+                <strong>GV phụ trách:</strong> {topic.proposed_by_detail ? (`${topic.proposed_by_detail.first_name} ${topic.proposed_by_detail.last_name}`.trim() || topic.proposed_by_detail.username) : `#${topic.proposed_by}`}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Ghi chú nguyện vọng cho Giảng viên (tùy chọn)
+              </label>
+              <textarea
+                rows={3}
+                value={registerNote}
+                onChange={(e) => setRegisterNote(e.target.value)}
+                placeholder="Nhập ghi chú hoặc lý do bạn mong muốn làm đề tài này..."
+                className={fieldClass}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button onClick={() => setRegisterModal(false)}>Hủy bỏ</Button>
+              <Button
+                variant="primary"
+                busy={registerMutation.isPending}
+                onClick={() => registerMutation.mutate()}
+              >
+                Gửi yêu cầu đăng ký
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

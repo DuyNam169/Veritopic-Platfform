@@ -43,6 +43,16 @@ export const CheckCircle2 = createIcon(
   </>
 );
 
+export const CheckCircle = CheckCircle2;
+
+export const XCircle = createIcon(
+  <>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m15 9-6 6" />
+    <path d="m9 9 6 6" />
+  </>
+);
+
 export const AlertCircle = createIcon(
   <>
     <circle cx="12" cy="12" r="10" />
@@ -316,5 +326,12 @@ export const GraduationCap = createIcon(
     <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />
     <path d="M22 10v6" />
     <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" />
+  </>
+);
+
+export const Bell = createIcon(
+  <>
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
   </>
 );
