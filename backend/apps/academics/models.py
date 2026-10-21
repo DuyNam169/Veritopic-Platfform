@@ -104,3 +104,22 @@ class Field(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class StudentClass(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+    cohort = models.ForeignKey(Cohort, on_delete=models.PROTECT, related_name="classes", null=True, blank=True)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="classes", null=True, blank=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["name", "id"]
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            self.students.update(class_name=self.name)
+
+    def __str__(self):
+        return self.name

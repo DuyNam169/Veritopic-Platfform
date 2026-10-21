@@ -8,8 +8,9 @@ export const academicsApi = {
   fields: () => api.get("/academics/fields/").then((r) => r.data),
 };
 
-export type CatalogKind = "cohorts" | "academic-years" | "semesters" | "departments" | "fields" | "majors";
+export type CatalogKind = "cohorts" | "academic-years" | "semesters" | "departments" | "fields" | "majors" | "classes";
 export interface CatalogItem {
+  cohort?: number | null; cohort_name?: string | null;
   description?: string;
   id: number; name: string; start_year?: number; end_year?: number;
   is_current?: boolean; academic_year?: number; start_date?: string; end_date?: string;

@@ -1,6 +1,7 @@
+import StudentClassSelect from "@/features/academics/components/StudentClassSelect";
 import { useMemo, useState, type FormEvent, type InputHTMLAttributes } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import axios from "axios";
 import {
   Users,
@@ -118,7 +119,7 @@ export default function UserManagementPage() {
     return users.filter((u) => {
       const q = search.trim().toLowerCase();
       const matchesText =
-        !q || [u.username, u.email, u.first_name, u.last_name, u.student_code].join(" ").toLowerCase().includes(q);
+        !q || [u.username, u.email, u.first_name, u.last_name, u.student_code, u.class_name].join(" ").toLowerCase().includes(q);
       const matchesRole = role === "all" || u.role === role;
       const matchesDepartment = department === "all" || u.department === department;
       return matchesText && matchesRole && matchesDepartment;
@@ -431,6 +432,7 @@ function UserRow({
             <strong className="block font-semibold text-slate-900">{fullName}</strong>
             <span className="mt-0.5 block text-xs text-slate-500 font-mono">
               @{user.username} · {user.email || "Chưa có email"}
+              {user.role === "student" && <span> · Lớp: {user.class_name || "Chưa cập nhật"}</span>}
               {user.student_code && ` · Mã SV: ${user.student_code}`}
             </span>
           </div>
@@ -549,6 +551,8 @@ function CreateUserDialog({
     register,
     handleSubmit,
     watch,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<CreateUserPayload>({ defaultValues: { role: "student" }, shouldUnregister: true });
   const selectedRole = watch("role");
@@ -564,6 +568,7 @@ function CreateUserDialog({
       if (errorData.username) toast.error(firstError(errorData, "username")!, "Lỗi username");
       else if (errorData.email) toast.error(firstError(errorData, "email")!, "Lỗi email");
       else if (errorData.password) toast.error(firstError(errorData, "password")!, "Lỗi mật khẩu");
+      else if (errorData.student_class) toast.error(firstError(errorData, "student_class")!, "Lỗi lớp");
       else if (errorData.cohort) toast.error(firstError(errorData, "cohort")!, "Lỗi khóa học");
       else toast.error("Không thể cấp tài khoản. Vui lòng kiểm tra lại thông tin.");
     },
@@ -629,6 +634,7 @@ function CreateUserDialog({
           {selectedRole === "student" && (
             <>
               <Input label="Mã sinh viên" {...register("student_code")} />
+              <Controller control={control} name="student_class" rules={{ required: true }} render={({ field }) => <StudentClassSelect value={field.value} department={watch("department")} cohort={watch("cohort")} onChange={(item) => { field.onChange(item?.id ?? null); if (item?.cohort) setValue("cohort", item.cohort); if (item?.department) setValue("department", item.department); }} />} />
               <label className="text-sm font-medium text-slate-800">
                 Khóa học
                 <select
@@ -706,13 +712,14 @@ function EditUserDialog({
     department: user.department,
     cohort: user.cohort,
     student_code: user.student_code,
+    student_class: user.student_class ?? null,
   });
   const update = useMutation({
-    mutationFn: () => usersApi.update(user.id, payload),
+    mutationFn: () => usersApi.update(user.id, { ...payload, ...(payload.role && payload.role !== "student" ? { student_class: null } : {}) }),
     onSuccess: () => { toast.success(`Đã cập nhật tài khoản @${user.username}.`); done(); },
   });
   const updateError = update.isError ? apiErrorData(update.error) : {};
-  const message = ["username", "email", "role", "cohort", "detail", "non_field_errors"]
+  const message = ["username", "email", "role", "cohort", "student_class", "detail", "non_field_errors"]
     .map((field) => firstError(updateError, field)).find(Boolean);
   const role = payload.role ?? user.role;
   const inputClass = "mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-600";
@@ -739,6 +746,7 @@ function EditUserDialog({
         <label className="text-sm font-medium">Vai trò<select value={role} onChange={(e) => { const next = e.target.value as Role; setPayload({ ...payload, role: next, ...(next !== "student" ? { cohort: null } : {}) }); }} className={inputClass}>{roles.map((item) => <option key={item} value={item}>{labels[item]}</option>)}</select></label>
         <label className="text-sm font-medium">Bộ môn<select value={payload.department ?? ""} onChange={(e) => setPayload({ ...payload, department: e.target.value ? Number(e.target.value) : null })} className={inputClass}><option value="">Chưa gắn bộ môn</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
         {role === "student" && <><label className="text-sm font-medium">Mã sinh viên<input value={payload.student_code ?? ""} onChange={(e) => setPayload({ ...payload, student_code: e.target.value })} className={inputClass} /></label><label className="text-sm font-medium">Khóa học<select value={payload.cohort ?? ""} onChange={(e) => setPayload({ ...payload, cohort: e.target.value ? Number(e.target.value) : null })} className={inputClass}><option value="">Chưa gắn khóa học</option>{cohorts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></>}
+        {role === "student" && <StudentClassSelect value={payload.student_class} department={payload.department} cohort={payload.cohort} onChange={(item) => setPayload({ ...payload, student_class: item?.id ?? null, ...(item?.cohort ? { cohort: item.cohort } : {}), ...(item?.department ? { department: item.department } : {}) })} />}
       </fieldset>
       <footer className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4"><button type="button" onClick={close} className="px-4 py-2 text-sm font-semibold text-slate-600">Hủy</button><button type="submit" disabled={update.isPending} className="rounded-xl bg-brand-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{update.isPending ? "Đang lưu..." : "Lưu thay đổi"}</button></footer>
     </form>

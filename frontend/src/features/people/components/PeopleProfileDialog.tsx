@@ -1,3 +1,4 @@
+import StudentClassSelect from "@/features/academics/components/StudentClassSelect";
 import { useEffect, useState, type FormEvent } from "react";
 
 import type { ManagedUser } from "@/features/accounts/api";
@@ -25,6 +26,7 @@ interface FormState {
   department: string;
   cohort: string;
   student_code: string;
+  student_class: number | null;
 }
 
 const emptyForm: FormState = {
@@ -36,6 +38,7 @@ const emptyForm: FormState = {
   department: "",
   cohort: "",
   student_code: "",
+  student_class: null,
 };
 
 export default function PeopleProfileDialog({
@@ -59,6 +62,7 @@ export default function PeopleProfileDialog({
       department: person.department?.toString() ?? "",
       cohort: person.cohort?.toString() ?? "",
       student_code: person.student_code ?? "",
+      student_class: person.student_class ?? null,
     } : emptyForm);
   }, [person]);
 
@@ -71,9 +75,10 @@ export default function PeopleProfileDialog({
     onSave({
       ...form,
       role,
+      student_class: role === "student" ? form.student_class : null,
       department: role === "teacher"
         ? form.department ? Number(form.department) : null
-        : person?.department ?? null,
+        : form.department ? Number(form.department) : null,
       cohort: role === "student"
         ? form.cohort ? Number(form.cohort) : null
         : person?.cohort ?? null,
@@ -115,6 +120,7 @@ export default function PeopleProfileDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Tên đăng nhập / mã hồ sơ" required value={form.username} onChange={(value) => update("username", value)} />
             {role === "student" && <Field label="Mã sinh viên" value={form.student_code} onChange={(value) => update("student_code", value)} />}
+            {role === "student" && <StudentClassSelect value={form.student_class} department={form.department ? Number(form.department) : null} cohort={form.cohort ? Number(form.cohort) : null} onChange={(item) => setForm({ ...form, student_class: item?.id ?? null, ...(item?.cohort ? { cohort: String(item.cohort) } : {}), ...(item?.department ? { department: String(item.department) } : {}) })} />}
             <Field label="Họ" value={form.first_name} onChange={(value) => update("first_name", value)} />
             <Field label="Tên" value={form.last_name} onChange={(value) => update("last_name", value)} />
             <Field label="Email" type="email" value={form.email} onChange={(value) => update("email", value)} />
@@ -155,12 +161,14 @@ function Field({
   onChange,
   required = false,
   type = "text",
+  maxLength,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
   type?: string;
+  maxLength?: number;
 }) {
   return (
     <label className="text-sm font-medium text-slate-700">
@@ -170,6 +178,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
+        maxLength={maxLength}
         className={fieldClass}
       />
     </label>

@@ -5,7 +5,7 @@ from django.db.models.deletion import ProtectedError
 
 from apps.common.permissions import ReadOnlyOrAdmin
 
-from .models import AcademicYear, Cohort, Department, Field, Major, Semester
+from .models import AcademicYear, Cohort, Department, Field, Major, Semester, StudentClass
 from .serializers import (
     AcademicYearSerializer,
     CohortSerializer,
@@ -13,6 +13,7 @@ from .serializers import (
     FieldSerializer,
     SemesterSerializer,
     MajorSerializer,
+    StudentClassSerializer,
 )
 
 
@@ -38,6 +39,13 @@ class CatalogViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         self.save_catalog(serializer)
+
+
+class StudentClassViewSet(CatalogViewSet):
+    queryset = StudentClass.objects.select_related("cohort", "department").all()
+    serializer_class = StudentClassSerializer
+    filterset_fields = ("cohort", "department")
+    search_fields = ("code", "name")
 
 
 class CohortViewSet(CatalogViewSet):

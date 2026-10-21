@@ -16,6 +16,7 @@ export interface UpdateProfilePayload {
   last_name?: string;
   email?: string;
   phone_number?: string;
+  student_class?: number | null;
 }
 
 export interface ChangePasswordPayload {

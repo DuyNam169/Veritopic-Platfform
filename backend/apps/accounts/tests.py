@@ -1,3 +1,4 @@
+from apps.academics.models import StudentClass
 import io
 
 from django.contrib.auth import get_user_model
@@ -185,6 +186,7 @@ class ProfileManagementTests(APITestCase):
 
         student_response = self.client.post(list_url, {
             "username": "student_k66",
+            "student_class": StudentClass.objects.get_or_create(code="CNTT01", defaults={"name": "CNTT01"})[0].pk,
             "email": "student_k66@veritopic.edu.vn",
             "password": "InitialPassword@123",
             "role": User.Role.STUDENT,
@@ -354,6 +356,7 @@ class PeopleDirectoryTests(APITestCase):
             "last_name": "Viên",
             "role": "student",
             "student_code": "SV002",
+            "student_class": StudentClass.objects.get_or_create(code="CNTT01", defaults={"name": "CNTT01"})[0].pk,
         })
 
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)

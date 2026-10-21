@@ -7,13 +7,44 @@ from apps.common.validation import validate_academic_links, validate_optional_co
 User = get_user_model()
 
 
+def validate_student_class(attrs, instance=None):
+    if instance is not None and not any(field in attrs for field in ("student_class", "role", "cohort", "department", "major")):
+        return
+    role = attrs.get("role", getattr(instance, "role", "student"))
+    selected = attrs.get("student_class", getattr(instance, "student_class", None))
+    if role != "student":
+        if "student_class" in attrs and attrs["student_class"]:
+            raise serializers.ValidationError({"student_class": "Chỉ sinh viên được gắn lớp."})
+        if instance and instance.role == "student":
+            attrs.update(student_class=None, class_name="")
+        return
+    if not selected:
+        if instance is None or "student_class" in attrs or instance.role != "student":
+            raise serializers.ValidationError({"student_class": "Vui lòng chọn lớp trong danh mục."})
+        return
+    for field in ("cohort", "department"):
+        expected = getattr(selected, field)
+        supplied = attrs.get(field, getattr(instance, field, None))
+        if expected and supplied and expected.pk != supplied.pk:
+            raise serializers.ValidationError({field: "Thông tin không khớp với lớp đã chọn."})
+        if expected:
+            attrs[field] = expected
+    major = attrs.get("major", getattr(instance, "major", None))
+    if major and selected.department_id and major.department_id != selected.department_id:
+        raise serializers.ValidationError({"student_class": "Lớp không thuộc chuyên ngành của sinh viên."})
+    if major and selected.cohort_id and selected.cohort.major_id and selected.cohort.major_id != major.pk:
+        raise serializers.ValidationError({"student_class": "Lớp không thuộc chuyên ngành của sinh viên."})
+    attrs["class_name"] = selected.name
+
+
 class AcademicProfileValidationMixin:
     def validate_lecturer_code(self, value):
         return validate_optional_code(User, "lecturer_code", value, self.instance)
 
     def validate_profile(self, attrs):
         request = self.context.get("request")
-        department = request.user.department if request and request.user.role == "department_head" else None
+        department = request.user.department if request and getattr(request.user, "role", None) == "department_head" else None
+        validate_student_class(attrs, self.instance)
         validate_academic_links(attrs, self.instance, department=department)
         role = attrs.get("role", getattr(self.instance, "role", "student"))
         code = attrs.get("lecturer_code", getattr(self.instance, "lecturer_code", ""))
@@ -24,6 +55,10 @@ class AcademicProfileValidationMixin:
 
 
 class UserSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        validate_student_class(attrs, self.instance)
+        return attrs
+
     def update(self, instance, validated_data):
         # A profile edit must not overwrite academic fields changed concurrently.
         for field, value in validated_data.items():
@@ -37,12 +72,12 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "username", "email", "first_name", "last_name",
             "role", "avatar", "phone_number", "department", "cohort", "student_code",
-            "class_name", "created_at", "last_login",
+            "class_name", "student_class", "created_at", "last_login",
             "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
         )
         # This serializer is also used by /auth/me/.  Never let a user change
         # their own role (or any other account's password) through that route.
-        read_only_fields = ("id", "role", "department", "cohort", "student_code", "created_at", "last_login", "username", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status")
+        read_only_fields = ("class_name", "id", "role", "department", "cohort", "student_code", "created_at", "last_login", "username", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status")
 
     def validate_email(self, value):
         existing = User.objects.filter(email__iexact=value).exclude(pk=self.instance.pk if self.instance else None)
@@ -98,10 +133,10 @@ class UserManagementSerializer(AcademicProfileValidationMixin, serializers.Model
         fields = (
             "id", "username", "email", "password", "first_name", "last_name",
             "role", "avatar", "phone_number", "department", "cohort", "student_code",
-            "class_name", "is_active", "department_name", "cohort_name",
+            "class_name", "student_class", "is_active", "department_name", "cohort_name",
             "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
         )
-        read_only_fields = ("id", "avatar")
+        read_only_fields = ("id", "avatar", "class_name")
 
     def validate_email(self, value):
         existing = User.objects.filter(email__iexact=value).exclude(pk=self.instance.pk if self.instance else None)
@@ -183,9 +218,9 @@ class PeopleProfileSerializer(AcademicProfileValidationMixin, serializers.ModelS
             "id", "username", "email", "first_name", "last_name", "role",
             "phone_number", "department", "department_name", "cohort",
             "cohort_name", "student_code", "is_active",
-            "class_name", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
+            "class_name", "student_class", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
         )
-        read_only_fields = ("id", "is_active")
+        read_only_fields = ("id", "is_active", "class_name")
 
     def validate_email(self, value):
         if value:
@@ -233,7 +268,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
 
-class RegisterSerializer(serializers.ModelSerializer):
+class RegisterSerializer(AcademicProfileValidationMixin, serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=("student",), default="student")
     """Sử dụng cho endpoint ?đăng ký công khai (AllowAny)."""
     password = serializers.CharField(write_only=True, min_length=8)
@@ -242,8 +277,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "username", "email", "password", "first_name", "last_name",
-            "role", "phone_number", "department", "student_code",
+            "role", "phone_number", "department", "student_code", "class_name", "student_class",
         )
+
+        read_only_fields = ("class_name",)
+
+    def validate(self, attrs):
+        self.validate_profile(attrs)
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop("password")

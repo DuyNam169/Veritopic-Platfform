@@ -7,9 +7,11 @@ from .views import (
     FieldViewSet,
     SemesterViewSet,
     MajorViewSet,
+    StudentClassViewSet,
 )
 
 router = DefaultRouter()
+router.register("classes", StudentClassViewSet, basename="student-class")
 router.register("cohorts", CohortViewSet, basename="cohort")
 router.register("academic-years", AcademicYearViewSet, basename="academic-year")
 router.register("semesters", SemesterViewSet, basename="semester")

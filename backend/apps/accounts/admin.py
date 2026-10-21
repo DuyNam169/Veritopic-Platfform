@@ -7,8 +7,9 @@ from .models import AdvisorRequest, Notification, OTPRecord, User
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     fieldsets = BaseUserAdmin.fieldsets + (
-        ("Thông tin bổ sung", {"fields": ("role", "phone_number", "student_code", "class_name", "department")}),
+        ("Thông tin bổ sung", {"fields": ("role", "phone_number", "student_code", "student_class", "class_name", "department", "cohort")}),
     )
+    readonly_fields = ("class_name",)
     list_display = ("username", "email", "get_full_name", "role", "is_staff")
     list_filter = ("role", "is_staff", "is_superuser")
 

@@ -15,11 +15,11 @@ class UserManagementViewSet(viewsets.ModelViewSet):
     CRUD tài khoản người dùng — CHỈ Admin.
     Dùng cho: tạo tài khoản Giảng viên/Trưởng bộ môn, khóa tài khoản, đổi role...
     """
-    queryset = User.objects.all().order_by("-created_at")
+    queryset = User.objects.select_related("department", "cohort", "student_class").all().order_by("-created_at")
     serializer_class = UserManagementSerializer
     permission_classes = (IsAdmin,)
-    filterset_fields = ("role", "department", "cohort")
-    search_fields = ("username", "email", "first_name", "last_name", "student_code")
+    filterset_fields = ("role", "department", "cohort", "student_class")
+    search_fields = ("username", "email", "first_name", "last_name", "student_code", "class_name")
 
     @action(detail=True, methods=["post"], url_path="reset-password")
     def reset_password(self, request, pk=None):
@@ -47,10 +47,10 @@ class PeopleDirectoryViewSet(
     serializer_class = PeopleProfileSerializer
     permission_classes = (IsAdminOrDepartmentHead,)
     queryset = User.objects.filter(role__in=("teacher", "student")).select_related(
-        "department", "cohort"
+        "department", "cohort", "student_class"
     ).order_by("role", "last_name", "first_name", "id")
-    filterset_fields = ("role", "department", "cohort", "is_active")
-    search_fields = ("username", "email", "first_name", "last_name", "student_code")
+    filterset_fields = ("role", "department", "cohort", "student_class", "is_active")
+    search_fields = ("username", "email", "first_name", "last_name", "student_code", "class_name")
 
     def get_queryset(self):
         qs = super().get_queryset()

@@ -29,6 +29,7 @@ export interface PeopleProfilePayload {
   department: number | null;
   cohort: number | null;
   student_code: string;
+  student_class: number | null;
 }
 
 async function allPages<T>(url: string): Promise<T[]> {

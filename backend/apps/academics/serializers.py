@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
-from .models import AcademicYear, Cohort, Department, Field, Major, Semester
+from .models import AcademicYear, Cohort, Department, Field, Major, Semester, StudentClass
 
 
 def validate_code(model, value, instance=None, required=False):
@@ -11,6 +11,35 @@ def validate_code(model, value, instance=None, required=False):
     if code and model.objects.filter(code__iexact=code).exclude(pk=instance.pk if instance else None).exists():
         raise serializers.ValidationError("Mã đã tồn tại.")
     return code
+
+
+class StudentClassSerializer(serializers.ModelSerializer):
+    cohort_name = serializers.CharField(source="cohort.name", read_only=True, allow_null=True)
+    department_name = serializers.CharField(source="department.name", read_only=True, allow_null=True)
+
+    def validate_code(self, value):
+        return validate_code(StudentClass, value, self.instance, required=True)
+
+    def validate_name(self, value):
+        value = value.strip()
+        if StudentClass.objects.filter(name__iexact=value).exclude(pk=self.instance.pk if self.instance else None).exists():
+            raise serializers.ValidationError("Tên lớp đã tồn tại.")
+        return value
+
+    def validate(self, attrs):
+        cohort = attrs.get("cohort", getattr(self.instance, "cohort", None))
+        department = attrs.get("department", getattr(self.instance, "department", None))
+        if cohort and cohort.major_id and department and cohort.major.department_id != department.pk:
+            raise serializers.ValidationError({"cohort": "Khóa học không thuộc bộ môn đã chọn."})
+        if self.instance and self.instance.students.exists():
+            for field in ("cohort", "department"):
+                if field in attrs and attrs[field] != getattr(self.instance, field):
+                    raise serializers.ValidationError({field: "Không thể đổi quan hệ của lớp đang có sinh viên."})
+        return attrs
+
+    class Meta:
+        model = StudentClass
+        fields = "__all__"
 
 
 class MajorSerializer(serializers.ModelSerializer):
@@ -45,7 +74,7 @@ class CohortSerializer(serializers.ModelSerializer):
         return name
 
     def validate(self, attrs):
-        if self.instance and "major" in attrs and attrs["major"] != self.instance.major and (self.instance.students.exists() or self.instance.topics.exists()):
+        if self.instance and "major" in attrs and attrs["major"] != self.instance.major and (self.instance.students.exists() or self.instance.topics.exists() or self.instance.classes.exists()):
             raise serializers.ValidationError({"major": "Không thể đổi chuyên ngành của khóa học đang được sử dụng."})
         start = attrs.get("start_year", getattr(self.instance, "start_year", None))
         end = attrs.get("end_year", getattr(self.instance, "end_year", None))

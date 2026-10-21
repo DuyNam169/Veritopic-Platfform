@@ -1,3 +1,5 @@
+import StudentClassSelect from "@/features/academics/components/StudentClassSelect";
+import { Controller } from "react-hook-form";
 import { useState } from "react";
 import axios from "axios";
 import { useForm } from "react-hook-form";
@@ -61,6 +63,7 @@ export default function ProfilePage() {
           last_name: user.last_name,
           email: user.email,
           phone_number: user.phone_number ?? "",
+          ...(user.role === "student" ? { student_class: user.student_class ?? null } : {}),
         }
       : undefined,
   });
@@ -232,6 +235,7 @@ export default function ProfilePage() {
                 </div>
               </label>
 
+              {user.role === "student" && <Controller control={profileForm.control} name="student_class" rules={{ required: true }} render={({ field }) => <StudentClassSelect value={field.value} department={user.department} cohort={user.cohort} onChange={(item) => field.onChange(item?.id ?? null)} />} />}
               <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Tên đăng nhập (Username):</span>

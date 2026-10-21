@@ -91,6 +91,7 @@ export default function PeopleDirectoryPage() {
         person.first_name,
         person.last_name,
         person.student_code,
+        person.class_name,
         person.phone_number,
       ].join(" ").toLocaleLowerCase("vi").includes(query);
     });
@@ -212,6 +213,7 @@ export default function PeopleDirectoryPage() {
                     {role === "student" && selected.student_code ? `${selected.student_code} · ` : ""}
                     {selected.email || selected.username}
                   </p>
+                  {role === "student" && <p className="mt-1 text-sm text-slate-500">Lớp: {selected.class_name || "Chưa cập nhật"}</p>}
                   {selected.phone_number && <p className="mt-1 text-sm text-slate-500">{selected.phone_number}</p>}
                 </div>
                 <div className="flex flex-col items-end gap-2">

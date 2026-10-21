@@ -14,6 +14,7 @@ export interface User {
   cohort_name?: string | null;
   student_code: string;
   class_name?: string;
+  student_class?: number | null;
   academic_degree?: string;
   specialization?: string;
   phone_number?: string;

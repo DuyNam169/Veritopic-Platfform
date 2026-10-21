@@ -36,6 +36,7 @@ class User(AbstractUser):
     student_code = models.CharField(max_length=50, blank=True, help_text="Mã số sinh viên (nếu role=student)")
     class_name = models.CharField(max_length=100, blank=True, help_text="Tên lớp (nếu role=student)")
     lecturer_code = models.CharField(max_length=50, blank=True, default="")
+    student_class = models.ForeignKey("academics.StudentClass", on_delete=models.PROTECT, null=True, blank=True, related_name="students")
     academic_degree = models.CharField(max_length=100, blank=True)
     specialization = models.TextField(blank=True)
     major = models.ForeignKey("academics.Major", on_delete=models.PROTECT, null=True, blank=True, related_name="users")
@@ -59,6 +60,14 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.get_role_display()})"
+
+    def save(self, *args, **kwargs):
+        fields = kwargs.get("update_fields")
+        if self.student_class_id and (fields is None or "student_class" in fields or "class_name" in fields):
+            self.class_name = self.student_class.name
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"class_name"}
+        super().save(*args, **kwargs)
 
 
 class OTPRecord(models.Model):

@@ -161,6 +161,11 @@ class Command(BaseCommand):
                 "is_staff": role == "admin",
                 "is_superuser": role == "admin",
             }
+            if role == "student" and defaults["cohort"] and defaults["department"]:
+                from apps.academics.models import StudentClass
+                class_code = f"{cohort_name}-{dept_code}01".upper()
+                selected, _ = StudentClass.objects.get_or_create(code=class_code, defaults={"name": class_code, "cohort": defaults["cohort"], "department": defaults["department"]})
+                defaults.update(student_class=selected, class_name=selected.name)
             user, _ = User.objects.update_or_create(username=username, defaults=defaults)
             user.set_password(DEMO_PASSWORD)
             user.save(update_fields=["password"])

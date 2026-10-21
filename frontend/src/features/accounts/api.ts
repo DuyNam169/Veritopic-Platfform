@@ -4,13 +4,13 @@ import type { Role, User } from "@/types";
 export interface ManagedUser extends User { is_active: boolean; }
 export interface CreateUserPayload {
   username: string; email: string; password: string; first_name: string; last_name: string; role: Role;
-  phone_number?: string; department?: number | null; cohort?: number | null; student_code?: string;
+  phone_number?: string; department?: number | null; cohort?: number | null; student_code?: string; student_class?: number | null;
 }
 export interface CohortOption { id: number; name: string; start_year: number; end_year: number; }
 export interface DepartmentOption { id: number; name: string; code: string; }
 export type UpdateUserPayload = Partial<Pick<ManagedUser,
   "username" | "email" | "first_name" | "last_name" | "phone_number" |
-  "role" | "department" | "cohort" | "student_code" | "is_active"
+  "role" | "department" | "cohort" | "student_code" | "student_class" | "is_active"
 >>;
 
 async function allPages<T>(url: string): Promise<T[]> {
