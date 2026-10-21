@@ -81,6 +81,7 @@ class Notification(models.Model):
         TOPIC_PROPOSAL_RESPONSE = "topic_proposal_response", "Phản hồi đề xuất đề tài"
         TOPIC_REGISTRATION = "topic_registration", "Đăng ký đề tài"
         TOPIC_REGISTRATION_RESPONSE = "topic_registration_response", "Phản hồi đăng ký đề tài"
+        TOPIC_ASSIGNMENT = "topic_assignment", "Phân công đề tài"
         SYSTEM = "system", "Hệ thống"
 
     recipient = models.ForeignKey(

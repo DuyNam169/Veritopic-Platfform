@@ -28,6 +28,8 @@ export const EditResubmitPage: React.FC = () => {
   const [isCheckingSimilarity, setIsCheckingSimilarity] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [resubmitSuccess, setResubmitSuccess] = useState(false);
+
 
   useEffect(() => {
     if (!id) return;
@@ -75,7 +77,7 @@ export const EditResubmitPage: React.FC = () => {
     try {
       setIsSubmitting(true);
       setErrorMsg("");
-      await teacherApi.resubmitTopic(Number(id), {
+      const result = await teacherApi.resubmitTopic(Number(id), {
         title,
         description,
         keywords,
@@ -87,8 +89,20 @@ export const EditResubmitPage: React.FC = () => {
         academic_year: Number(academicYearId),
         semester: Number(semesterId),
       });
-      alert("Đã gửi lại đề tài, đang chờ phê duyệt");
-      navigate("/teacher/topics");
+
+      // Hiển thị kết quả kiểm tra tương đồng mới từ phản hồi resubmit
+      if (result.top_similar && result.top_similar.length > 0) {
+        const mapped = result.top_similar.map((r) => ({
+          topic: { id: r.topic_id, title: r.topic_title } as any,
+          similarity_percent: r.similarity_percent,
+          warning_level: r.warning_level,
+        }));
+        setSimilarityResults(mapped);
+        setResubmitSuccess(true);
+      } else {
+        // Không có kết quả tương đồng — chuyển thẳng về
+        navigate("/teacher/topics");
+      }
     } catch (err: any) {
       if (err.response?.status === 409) {
         setErrorMsg("Đề tài không ở trạng thái Yêu cầu sửa. Vui lòng tải lại trang để xem trạng thái mới nhất.");
@@ -100,8 +114,47 @@ export const EditResubmitPage: React.FC = () => {
     }
   };
 
+
   if (!topic) {
     return <div className="p-8 text-center text-xs text-slate-400">Đang tải thông tin đề tài...</div>;
+  }
+
+  // Sau khi resubmit thành công — hiển thị kết quả tương đồng
+  if (resubmitSuccess) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 shadow-xs space-y-2">
+          <div className="flex items-center gap-2 font-bold text-emerald-900">
+            <span>✅ Đã nộp lại đề tài thành công!</span>
+          </div>
+          <p className="text-xs text-emerald-700">
+            Đề tài <strong>#{topic.id}</strong> đã được gửi lại và đang chờ Trưởng bộ môn phê duyệt.
+          </p>
+        </div>
+
+        {similarityResults.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="font-bold text-slate-900 text-sm">
+              📊 Kết quả kiểm tra tương đồng sau khi sửa tên
+            </h3>
+            <SimilarityPanel
+              results={similarityResults}
+              isLoading={false}
+              currentDraft={{ title, description }}
+            />
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => navigate("/teacher/topics")}
+            className="rounded-xl bg-[#006A60] px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#00524a]"
+          >
+            Quay về Danh sách Đề tài &rarr;
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

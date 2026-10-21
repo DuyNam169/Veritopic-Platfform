@@ -28,7 +28,12 @@ class MyStudentsView(APIView):
     permission_classes = (IsTeacher,)
 
     def get(self, request):
-        assignments = scope_assignments(TopicAssignment.objects.select_related("topic").prefetch_related("students", "reports"), request.user)
+        assignments = scope_assignments(
+            TopicAssignment.objects.select_related("topic", "topic__cohort", "topic__department").prefetch_related(
+                "students__cohort", "students__department", "reports"
+            ),
+            request.user,
+        )
         data = []
         search = request.query_params.get("search", "").casefold()
         for assignment in assignments:
@@ -37,10 +42,26 @@ class MyStudentsView(APIView):
                 name = student.get_full_name() or student.username
                 if search and search not in f"{name} {student.student_code} {assignment.topic.title}".casefold():
                     continue
-                data.append({"assignment_id": assignment.pk, "assignment_status": assignment.status,
-                    "assignment_status_display": assignment.get_status_display(), "due_date": assignment.due_date,
-                    "topic_id": assignment.topic_id, "topic_title": assignment.topic.title,
-                    "student_id": student.pk, "student_name": name, "student_code": student.student_code,
-                    "class_name": student.class_name, "email": student.email, "phone_number": student.phone_number,
-                    "latest_percent": latest.percent if latest else 0, "latest_submitted_at": latest.submitted_at if latest else None})
+                cohort = student.cohort or assignment.topic.cohort
+                dept = student.department or assignment.topic.department
+                data.append({
+                    "assignment_id": assignment.pk,
+                    "assignment_status": assignment.status,
+                    "assignment_status_display": assignment.get_status_display(),
+                    "due_date": assignment.due_date,
+                    "topic_id": assignment.topic_id,
+                    "topic_title": assignment.topic.title,
+                    "student_id": student.pk,
+                    "student_name": name,
+                    "student_code": student.student_code,
+                    "class_name": student.class_name,
+                    "email": student.email,
+                    "phone_number": student.phone_number,
+                    "cohort_id": cohort.id if cohort else None,
+                    "cohort_name": cohort.name if cohort else "",
+                    "department_id": dept.id if dept else None,
+                    "department_name": dept.name if dept else "",
+                    "latest_percent": latest.percent if latest else 0,
+                    "latest_submitted_at": latest.submitted_at if latest else None,
+                })
         return Response(data)

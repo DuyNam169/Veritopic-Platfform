@@ -1,21 +1,39 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { teacherApi } from "../api";
+import { api } from "@/shared/lib/axios";
 import type { ProjectProgressItem, Topic } from "../types";
 
 export const TeacherDashboardPage: React.FC = () => {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [projects, setProjects] = useState<ProjectProgressItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Số yêu cầu đang chờ xử lý từ sinh viên
+  const [pendingAdvisorCount, setPendingAdvisorCount] = useState(0);
+  const [pendingProposalCount, setPendingProposalCount] = useState(0);
+  const [pendingRegistrationCount, setPendingRegistrationCount] = useState(0);
 
   useEffect(() => {
-    Promise.all([teacherApi.getMyTopics(), teacherApi.getProjectsProgress()])
-      .then(([topicsRes, projectsRes]) => {
+    Promise.all([
+      teacherApi.getMyTopics(),
+      teacherApi.getProjectsProgress(),
+      // Lấy số lượng yêu cầu pending từ SV
+      api.get("/accounts/advisor-requests/").catch(() => ({ data: [] })),
+      api.get("/topics/student-proposals/").catch(() => ({ data: [] })),
+      api.get("/topics/registrations/").catch(() => ({ data: [] })),
+    ])
+      .then(([topicsRes, projectsRes, advisorRes, proposalRes, regRes]) => {
         setTopics(topicsRes.results || topicsRes || []);
         setProjects(projectsRes || []);
+
+        const toArr = (r: any) => (Array.isArray(r?.data) ? r.data : r?.data?.results ?? []);
+        setPendingAdvisorCount(toArr(advisorRes).filter((x: any) => x.status === "pending").length);
+        setPendingProposalCount(toArr(proposalRes).filter((x: any) => x.status === "pending").length);
+        setPendingRegistrationCount(toArr(regRes).filter((x: any) => x.status === "pending").length);
       })
       .finally(() => setIsLoading(false));
   }, []);
+
 
   const pendingCount = topics.filter((t) => t.status === "pending").length;
   const approvedCount = topics.filter((t) => t.status === "approved").length;
@@ -41,7 +59,7 @@ export const TeacherDashboardPage: React.FC = () => {
       </div>
 
       {/* Summary Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
           <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Đề tài Chờ Duyệt</div>
           <div className="mt-2 flex items-baseline justify-between">
@@ -77,7 +95,33 @@ export const TeacherDashboardPage: React.FC = () => {
             </Link>
           </div>
         </div>
+
+        {/* Card yêu cầu đang chờ từ sinh viên */}
+        <div className={`rounded-2xl border p-5 shadow-xs ${
+          (pendingAdvisorCount + pendingProposalCount + pendingRegistrationCount) > 0
+            ? "border-orange-300/80 bg-orange-50/60"
+            : "border-slate-200/80 bg-white"
+        }`}>
+          <div className="text-[11px] font-bold text-orange-600 uppercase tracking-wider">Yêu cầu từ Sinh viên</div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-orange-600">
+              {pendingAdvisorCount + pendingProposalCount + pendingRegistrationCount}
+            </span>
+            <Link to="/teacher/student-requests" className="text-xs font-bold text-orange-600 hover:underline">
+              Xử lý &rarr;
+            </Link>
+          </div>
+          <div className="mt-2 space-y-0.5 text-[10px] text-slate-500">
+            {pendingAdvisorCount > 0 && <div>· {pendingAdvisorCount} yêu cầu chọn GVHD</div>}
+            {pendingProposalCount > 0 && <div>· {pendingProposalCount} đề xuất đề tài</div>}
+            {pendingRegistrationCount > 0 && <div>· {pendingRegistrationCount} đăng ký đề tài</div>}
+            {(pendingAdvisorCount + pendingProposalCount + pendingRegistrationCount) === 0 && (
+              <div className="text-slate-400">Không có yêu cầu nào</div>
+            )}
+          </div>
+        </div>
       </div>
+
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

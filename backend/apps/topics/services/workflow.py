@@ -70,11 +70,32 @@ def approve_topic(topic: Topic, actor, note: str = ""):
 
 @transaction.atomic
 def reject_topic(topic: Topic, actor, note: str = ""):
+    from apps.accounts.models import Notification
+    from apps.topics.models import TopicAssignment
+
     topic.status = Topic.Status.REJECTED
     topic.reviewed_by = actor
     topic.review_note = note
     topic.save(update_fields=["status", "reviewed_by", "review_note", "updated_at"])
     TopicHistory.objects.create(topic=topic, action=TopicHistory.Action.REJECTED, actor=actor, note=note)
+
+    # Nếu đề tài có assignment đang active (ví dụ sinh viên đề xuất đề tài được GV duyệt trước đó),
+    # khi Trưởng bộ môn từ chối đề tài thì hủy các assignment liên quan và gửi thông báo cho sinh viên.
+    active_assignments = topic.assignments.filter(status=TopicAssignment.Status.ACTIVE).prefetch_related("students")
+    for assign in active_assignments:
+        assign.status = TopicAssignment.Status.CANCELLED
+        assign.note = f"Đề tài bị Trưởng bộ môn từ chối duyệt. Lý do: {note}".strip()
+        assign.save(update_fields=["status", "note"])
+
+        for sv in assign.students.all():
+            Notification.objects.create(
+                recipient=sv,
+                sender=actor,
+                title="Đề tài đồ án bị từ chối phê duyệt",
+                message=f"Đề tài '{topic.title}' đã bị Trưởng bộ môn từ chối duyệt.{f' Lý do: {note}' if note else ''} Lượt giao đề tài của bạn đã được hủy.",
+                notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
+                link="/projects",
+            )
     return topic
 
 
@@ -92,7 +113,9 @@ def request_rename(topic: Topic, actor, note: str = ""):
 def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = "", due_date=None):
     from django.contrib.auth import get_user_model
     from rest_framework.exceptions import ValidationError
+    from apps.accounts.models import Notification
     from apps.topics.models import TopicAssignment
+
     topic = Topic.objects.select_for_update().get(pk=topic.pk)
     ids = sorted(set(student_ids))
     students = list(get_user_model().objects.select_for_update().filter(pk__in=ids, role="student", is_active=True, student_status="active").order_by("pk"))
@@ -108,6 +131,7 @@ def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = "", du
         raise ValidationError("Sinh viên phải thuộc chuyên ngành của đề tài.")
     if TopicAssignment.objects.filter(students__in=ids, topic__semester=topic.semester, status="active").exists():
         raise ValidationError("Sinh viên đã có đề tài đang thực hiện trong học kỳ này.")
+
     assignment = TopicAssignment.objects.create(topic=topic, assigned_by=actor, note=note, due_date=due_date)
     assignment.students.set(student_ids)
     summary = f"Giao cho {len(student_ids)} sinh viên."
@@ -118,4 +142,19 @@ def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = "", du
         actor=actor,
         note=history_note,
     )
+
+    # Tự động gửi thông báo cho từng sinh viên được phân công
+    actor_name = actor.get_full_name() or actor.username
+    due_info = f" Hạn nộp hoàn thành: {due_date.strftime('%d/%m/%Y')}." if due_date else ""
+    note_info = f" Lời dặn: {note}" if note else ""
+    for student in students:
+        Notification.objects.create(
+            recipient=student,
+            sender=actor,
+            title="Bạn đã được phân công đề tài đồ án",
+            message=f"Giảng viên {actor_name} đã phân công cho bạn thực hiện đề tài '{topic.title}'.{due_info}{note_info}",
+            notification_type=Notification.NotificationType.TOPIC_ASSIGNMENT,
+            link="/projects",
+        )
+
     return assignment

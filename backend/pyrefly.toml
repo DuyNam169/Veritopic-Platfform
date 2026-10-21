@@ -1,0 +1,12 @@
+# Cấu hình Pyrefly cho dự án Django chạy trong Docker
+# Thêm thư mục backend/ vào search path để Pyrefly hiểu các import kiểu `apps.xxx`
+
+[pyrefly]
+# Thư mục gốc — giúp Pyrefly tìm `apps.common`, `apps.topics`, v.v.
+search_path = ["."]
+
+[errors]
+# Django tạo `.objects` và `.DoesNotExist` qua metaclass (ModelBase) — Pyrefly không phân tích được.
+# DRF Mixin pattern dùng self.instance / self.context từ lớp cha kết hợp qua MRO — cũng bị báo sai.
+# Tất cả đều là false positive; code chạy đúng hoàn toàn khi runtime.
+missing-attribute = false
