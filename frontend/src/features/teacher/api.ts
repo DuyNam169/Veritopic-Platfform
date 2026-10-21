@@ -1,5 +1,6 @@
 import { api } from "@/shared/lib/axios";
 import type {
+  MyAdviseeItem,
   MyStudentItem,
   ProjectProgressItem,
   ProgressFeedback,
@@ -80,6 +81,9 @@ export const teacherApi = {
 
   getMyStudents: (search?: string) =>
     api.get<MyStudentItem[]>("/topics/my-students/", { params: { search } }).then((r) => r.data),
+
+  getMyAdvisees: (search?: string) =>
+    api.get<MyAdviseeItem[]>("/auth/advisor-requests/my-advisees/", { params: { search } }).then((r) => r.data),
 
   updateAssignmentStatus: (assignmentId: number, status: "completed" | "cancelled" | "active") =>
     api.patch(`/topics/assignments/${assignmentId}/update-status/`, { status }).then((r) => r.data),

@@ -53,6 +53,18 @@ class TopicSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSeria
     assignment_count = serializers.IntegerField(source="assignments.count", read_only=True)
     can_register = serializers.SerializerMethodField()
     has_my_cohort_registered = serializers.SerializerMethodField()
+    # Giảng viên cần biết đề tài đã được giao chưa để hiển thị đúng nút hành động
+    is_assigned = serializers.SerializerMethodField()
+    active_assignment_id = serializers.SerializerMethodField()
+
+    def get_is_assigned(self, obj):
+        """True nếu đề tài đang có ít nhất 1 lượt giao active."""
+        return obj.assignments.filter(status="active").exists()
+
+    def get_active_assignment_id(self, obj):
+        """Trả về ID của assignment active đầu tiên, hoặc None nếu chưa giao."""
+        assignment = obj.assignments.filter(status="active").first()
+        return assignment.pk if assignment else None
 
     def get_has_my_cohort_registered(self, obj):
         request = self.context.get("request")
@@ -86,6 +98,7 @@ class TopicSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSeria
             "academic_year", "semester", "proposed_by", "proposed_by_detail",
             "department_name", "field_name", "cohort_name", "academic_year_name",
             "semester_name", "assignment_count", "can_register", "has_my_cohort_registered",
+            "is_assigned", "active_assignment_id",
             "topic_code", "major", "project_type", "architecture", "created_by",
             "status", "reviewed_by", "review_note", "created_at", "updated_at",
         )

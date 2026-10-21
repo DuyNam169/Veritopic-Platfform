@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { teacherApi } from "../api";
-import { SimilarityPanel } from "../components/SimilarityPanel";
-import type { SimilarTopicResult } from "../types";
 import { api } from "@/shared/lib/axios";
 import { useAuthStore } from "@/features/auth/store";
+import { topicResourcesApi, type SimilarityCheckResult } from "@/features/topics/resourcesApi";
+import { SimilarityBadge } from "../components/SimilarityBadge";
 
 export const ProposeTopicPage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,39 +29,18 @@ export const ProposeTopicPage: React.FC = () => {
   const [academicYearId, setAcademicYearId] = useState<number | "">("");
   const [semesterId, setSemesterId] = useState<number | "">("");
 
-  // Check state
-  const [titleCheckResult, setTitleCheckResult] = useState<{ exact_duplicate?: boolean } | null>(null);
-  const [isCheckingTitle, setIsCheckingTitle] = useState(false);
-  const [similarityResults, setSimilarityResults] = useState<SimilarTopicResult[]>([]);
+  // AI Similarity Check state
+  const [similarityResults, setSimilarityResults] = useState<SimilarityCheckResult[]>([]);
   const [isCheckingSimilarity, setIsCheckingSimilarity] = useState(false);
+  const [exactDuplicate, setExactDuplicate] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
+  const [comparingItem, setComparingItem] = useState<SimilarityCheckResult | null>(null);
+
+  // Submit
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const user = useAuthStore(s => s.user);
-  const DRAFT_KEY = `veritopic_propose_draft_${user?.id}`;
-
-  // Khôi phục bản nháp từ localStorage nếu có
-  useEffect(() => {
-    const savedDraft = localStorage.getItem(DRAFT_KEY);
-    if (savedDraft) {
-      try {
-        const parsed = JSON.parse(savedDraft);
-        if (parsed.title) setTitle(parsed.title);
-        if (parsed.description) setDescription(parsed.description);
-        if (parsed.keywords) setKeywords(parsed.keywords);
-        if (parsed.requirements) setRequirements(parsed.requirements);
-      } catch (e) {
-        console.error("Lỗi đọc bản nháp", e);
-      }
-    }
-  }, []);
-
-  // Tự động lưu nháp cục bộ khi nhập thông tin
-  useEffect(() => {
-    if (title || description || keywords.length > 0 || requirements) {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, keywords, requirements }));
-    }
-  }, [title, description, keywords, requirements]);
 
   useEffect(() => {
     Promise.all([
@@ -97,6 +76,13 @@ export const ProposeTopicPage: React.FC = () => {
     if (!available.some(s => s.id === semesterId)) setSemesterId(available[0]?.id ?? "");
   }, [academicYearId, semesters, semesterId]);
 
+  // Reset kết quả khi tiêu đề thay đổi
+  useEffect(() => {
+    setHasChecked(false);
+    setSimilarityResults([]);
+    setExactDuplicate(false);
+  }, [title]);
+
   const addKeyword = () => {
     const trimmed = keywordInput.trim();
     if (trimmed && !keywords.includes(trimmed)) {
@@ -109,19 +95,7 @@ export const ProposeTopicPage: React.FC = () => {
     setKeywords(keywords.filter((k) => k !== tag));
   };
 
-  const handleCheckTitle = async () => {
-    if (!title.trim()) return;
-    try {
-      setIsCheckingTitle(true);
-      const res = await teacherApi.checkTitle(title);
-      setTitleCheckResult(res);
-    } catch {
-      setErrorMsg("Không thể kiểm tra trùng tên.");
-    } finally {
-      setIsCheckingTitle(false);
-    }
-  };
-
+  /** Gọi API AI kiểm tra tương đồng thật (cùng pipeline với khi tạo đề tài chính thức) */
   const handleCheckSimilarity = async () => {
     if (!title.trim()) {
       setErrorMsg("Vui lòng nhập tên đề tài trước khi kiểm tra tương đồng.");
@@ -130,14 +104,22 @@ export const ProposeTopicPage: React.FC = () => {
     try {
       setIsCheckingSimilarity(true);
       setErrorMsg("");
-      const res = await teacherApi.checkSimilarityDraft({
-        title,
-        description,
-        keywords,
+      const res = await topicResourcesApi.checkSimilarity({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        top_k: 10,
       });
-      setSimilarityResults(res);
+      setSimilarityResults(res.results);
+      // Phát hiện trùng tên chính xác nếu có kết quả 100%
+      setExactDuplicate(
+        res.results.some(r => r.warning_level === "duplicate" || r.percent >= 100)
+      );
+      setHasChecked(true);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || "Không thể kiểm tra tương đồng. Thử lại sau.");
+      setErrorMsg(
+        err.response?.data?.detail ||
+        "Không thể kiểm tra tương đồng. Dịch vụ AI có thể đang khởi động, vui lòng thử lại."
+      );
     } finally {
       setIsCheckingSimilarity(false);
     }
@@ -172,7 +154,6 @@ export const ProposeTopicPage: React.FC = () => {
         academic_year: Number(academicYearId),
         semester: Number(semesterId),
       });
-      localStorage.removeItem(DRAFT_KEY);
       alert("Đề xuất đã được gửi thành công, đang chờ phê duyệt");
       navigate("/teacher/topics");
     } catch (err: any) {
@@ -184,6 +165,14 @@ export const ProposeTopicPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  /** Label màu cảnh báo */
+  const warningMeta: Record<string, { label: string; cls: string }> = {
+    duplicate: { label: "Trùng tên", cls: "bg-rose-50 text-rose-700 border border-rose-200" },
+    high:      { label: "Tương đồng cao", cls: "bg-orange-50 text-orange-700 border border-orange-200" },
+    review:    { label: "Cần xem xét", cls: "bg-amber-50 text-amber-700 border border-amber-200" },
+    normal:    { label: "Bình thường", cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   };
 
   return (
@@ -205,43 +194,26 @@ export const ProposeTopicPage: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* ── Thông tin đề tài ── */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs space-y-4">
           <h3 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3">Thông tin Đề tài</h3>
 
-          {/* Title input with Check Title button */}
+          {/* Tên đề tài */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
               Tên Đề tài <span className="text-rose-500">*</span>
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Nhập tiêu đề đề tài đồ án (1 - 500 ký tự)"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setTitleCheckResult(null);
-                }}
-                className="flex-1 rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
-                required
-              />
-              <button
-                type="button"
-                onClick={handleCheckTitle}
-                disabled={isCheckingTitle || !title.trim()}
-                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-              >
-                {isCheckingTitle ? "Đang kiểm tra..." : "Kiểm tra trùng tên"}
-              </button>
-            </div>
-            {titleCheckResult && (
-              <p className={`mt-1.5 text-xs font-semibold ${titleCheckResult.exact_duplicate ? "text-rose-600" : "text-emerald-600"}`}>
-                {titleCheckResult.exact_duplicate ? "⚠️ Phát hiện trùng tên chính xác với đề tài khác!" : "✓ Tiêu đề chưa bị trùng lặp chính xác."}
-              </p>
-            )}
+            <input
+              type="text"
+              placeholder="Nhập tiêu đề đề tài đồ án (1 - 500 ký tự)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
+              required
+            />
           </div>
 
-          {/* Description */}
+          {/* Mô tả */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Mô tả Đề tài</label>
             <textarea
@@ -253,7 +225,7 @@ export const ProposeTopicPage: React.FC = () => {
             />
           </div>
 
-          {/* Keywords Tag Input */}
+          {/* Keywords */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Từ khóa (Keywords)</label>
             <div className="flex gap-2 mb-2">
@@ -262,19 +234,10 @@ export const ProposeTopicPage: React.FC = () => {
                 placeholder="Ví dụ: React, Django, Blockchain (Nhấn Thêm)"
                 value={keywordInput}
                 onChange={(e) => setKeywordInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addKeyword();
-                  }
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addKeyword(); } }}
                 className="flex-1 rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
               />
-              <button
-                type="button"
-                onClick={addKeyword}
-                className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-              >
+              <button type="button" onClick={addKeyword} className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">
                 Thêm
               </button>
             </div>
@@ -282,9 +245,7 @@ export const ProposeTopicPage: React.FC = () => {
               {keywords.map((tag) => (
                 <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-[#E6F4F1] px-3 py-1 text-xs font-semibold text-[#006A60]">
                   #{tag}
-                  <button type="button" onClick={() => removeKeyword(tag)} className="text-[#006A60]/60 hover:text-[#006A60] font-bold">
-                    ✕
-                  </button>
+                  <button type="button" onClick={() => removeKeyword(tag)} className="text-[#006A60]/60 hover:text-[#006A60] font-bold">✕</button>
                 </span>
               ))}
             </div>
@@ -294,10 +255,7 @@ export const ProposeTopicPage: React.FC = () => {
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Số sinh viên tối đa</label>
               <input
-                type="number"
-                min="1"
-                max="5"
-                value={maxStudents}
+                type="number" min="1" max="5" value={maxStudents}
                 onChange={(e) => setMaxStudents(parseInt(e.target.value) || 1)}
                 className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
               />
@@ -305,9 +263,7 @@ export const ProposeTopicPage: React.FC = () => {
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Yêu cầu thực hiện</label>
               <input
-                type="text"
-                placeholder="Ví dụ: Thành thạo Python, SQL..."
-                value={requirements}
+                type="text" placeholder="Ví dụ: Thành thạo Python, SQL..." value={requirements}
                 onChange={(e) => setRequirements(e.target.value)}
                 className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
               />
@@ -315,74 +271,43 @@ export const ProposeTopicPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Academic Selectors */}
+        {/* ── Danh mục đào tạo ── */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs space-y-4">
           <h3 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3">Danh mục Đào tạo</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Bộ môn *</label>
-              <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(Number(e.target.value))}
-                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
-                required
-              >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
+              <select value={departmentId} onChange={(e) => setDepartmentId(Number(e.target.value))}
+                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none" required>
+                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Lĩnh vực chuyên sâu</label>
-              <select
-                value={fieldId}
-                onChange={(e) => setFieldId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
-              >
+              <select value={fieldId} onChange={(e) => setFieldId(e.target.value ? Number(e.target.value) : "")}
+                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none">
                 <option value="">-- Không chọn --</option>
-                {fields.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
+                {fields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Khóa sinh viên *</label>
-              <select
-                value={cohortId}
-                onChange={(e) => setCohortId(Number(e.target.value))}
-                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
-                required
-              >
-                {cohorts.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+              <select value={cohortId} onChange={(e) => setCohortId(Number(e.target.value))}
+                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none" required>
+                {cohorts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Năm học *</label>
-              <select
-                value={academicYearId}
-                onChange={(e) => setAcademicYearId(Number(e.target.value))}
-                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
-                required
-              >
-                {academicYears.map((ay) => (
-                  <option key={ay.id} value={ay.id}>{ay.name}</option>
-                ))}
+              <select value={academicYearId} onChange={(e) => setAcademicYearId(Number(e.target.value))}
+                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none" required>
+                {academicYears.map((ay) => <option key={ay.id} value={ay.id}>{ay.name}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Học kỳ *</label>
-              <select
-                value={semesterId}
-                onChange={(e) => setSemesterId(Number(e.target.value))}
-                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none"
-                required
-              >
+              <select value={semesterId} onChange={(e) => setSemesterId(Number(e.target.value))}
+                className="w-full rounded-full border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs text-slate-700 focus:bg-white focus:border-[#006A60] focus:outline-none" required>
                 {semesters.filter(s => s.academic_year === academicYearId).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -391,25 +316,111 @@ export const ProposeTopicPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Live Similarity Check Section */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
+        {/* ── Kiểm tra tương đồng AI ── */}
+        <div className="rounded-2xl border border-[#006A60]/20 bg-[#F0FAF8] p-6 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-bold text-[#006A60] text-sm flex items-center gap-2">
+                🤖 Kiểm tra Tương đồng AI
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Sử dụng PhoBERT để so sánh ngữ nghĩa với toàn bộ ngân hàng đề tài trước khi gửi.
+              </p>
+            </div>
             <button
               type="button"
               onClick={handleCheckSimilarity}
-              disabled={isCheckingSimilarity}
-              className="rounded-full border border-[#006A60]/30 bg-[#E6F4F1] px-5 py-2 text-xs font-bold text-[#006A60] hover:bg-[#d5eee9] transition-colors"
+              disabled={isCheckingSimilarity || !title.trim()}
+              className="rounded-full border border-[#006A60] bg-[#006A60] px-5 py-2 text-xs font-bold text-white hover:bg-[#00524a] disabled:opacity-40 transition-colors flex items-center gap-2"
             >
-              {isCheckingSimilarity ? "Đang quét AI..." : "🔍 Chạy Kiểm Tra Tương Đồng AI (Bản Nháp)"}
+              {isCheckingSimilarity
+                ? <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> Đang phân tích AI...</>
+                : "🔍 Chạy Kiểm Tra Tương Đồng AI"}
             </button>
           </div>
 
-          <SimilarityPanel
-            results={similarityResults}
-            exactDuplicate={titleCheckResult?.exact_duplicate}
-            isLoading={isCheckingSimilarity}
-            currentDraft={{ title, description }}
-          />
+          {/* Kết quả */}
+          {isCheckingSimilarity && (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
+              <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#006A60] border-t-transparent" />
+              <p className="mt-2 text-xs text-slate-500 font-medium">Đang phân tích ngữ nghĩa bằng PhoBERT...</p>
+            </div>
+          )}
+
+          {!isCheckingSimilarity && hasChecked && (
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+                <span className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                  Kết quả so sánh trùng lặp / tương đồng
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600">
+                    {similarityResults.length} kết quả
+                  </span>
+                </span>
+                {exactDuplicate && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700">
+                    ⚠️ Phát hiện trùng tên!
+                  </span>
+                )}
+              </div>
+
+              {/* Cảnh báo trùng tên */}
+              {exactDuplicate && (
+                <div className="px-5 py-3 bg-rose-50 border-b border-rose-100 text-xs text-rose-800">
+                  Tên đề tài bạn nhập đã <strong>trùng 100%</strong> với đề tài trong hệ thống. Vui lòng đổi tên trước khi gửi.
+                </div>
+              )}
+
+              {/* Danh sách kết quả */}
+              {similarityResults.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-500">
+                  ✅ Không tìm thấy đề tài nào tương đồng đáng kể. Đề tài của bạn có vẻ rất mới lạ!
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {similarityResults.map((r, idx) => {
+                    const meta = warningMeta[r.warning_level] ?? warningMeta.normal;
+                    return (
+                      <div key={r.topic_id ?? idx} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm font-semibold text-slate-900 line-clamp-2">{r.title}</h4>
+                            <span className={`shrink-0 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold ${meta.cls}`}>
+                              {meta.label}
+                            </span>
+                          </div>
+                          {r.description && (
+                            <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{r.description}</p>
+                          )}
+                          {r.groq_explanation && r.assessment_status === "completed" && (
+                            <p className="mt-1 text-xs text-indigo-700 bg-indigo-50 rounded-lg px-2 py-1 line-clamp-2">
+                              🤖 {r.groq_explanation}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <SimilarityBadge percent={r.percent} level={r.warning_level} />
+                          <button
+                            type="button"
+                            onClick={() => setComparingItem(r)}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            So sánh
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isCheckingSimilarity && !hasChecked && (
+            <p className="text-xs text-slate-400 text-center py-2">
+              Nhập tên đề tài rồi bấm <strong>Chạy Kiểm Tra Tương Đồng AI</strong> để phát hiện đề tài tương tự trước khi gửi.
+            </p>
+          )}
         </div>
 
         {/* Submit Actions */}
@@ -430,7 +441,41 @@ export const ProposeTopicPage: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Modal So sánh song song */}
+      {comparingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-bold text-slate-900">So sánh đối chiếu song song</h3>
+              <button onClick={() => setComparingItem(null)} className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-[#006A60]/30 bg-[#F0FAF8] p-4 space-y-2">
+                <span className="text-xs font-bold text-[#006A60] uppercase tracking-wider">Đề tài bạn đang soạn</span>
+                <h4 className="font-semibold text-slate-900 text-sm">{title || "Chưa có tên"}</h4>
+                <p className="text-xs text-slate-600 whitespace-pre-wrap">{description || "Chưa có mô tả"}</p>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2">
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Đề tài trong ngân hàng</span>
+                <h4 className="font-semibold text-slate-900 text-sm">{comparingItem.title}</h4>
+                <p className="text-xs text-slate-600 whitespace-pre-wrap">{comparingItem.description || "Chưa có mô tả"}</p>
+                {comparingItem.groq_explanation && comparingItem.assessment_status === "completed" && (
+                  <div className="mt-2 rounded-lg bg-indigo-50 border border-indigo-100 p-3">
+                    <p className="text-xs font-semibold text-indigo-700 mb-1">🤖 Nhận xét AI:</p>
+                    <p className="text-xs text-indigo-800">{comparingItem.groq_explanation}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button type="button" onClick={() => setComparingItem(null)} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800">
+                Đóng đối chiếu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-

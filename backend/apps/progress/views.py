@@ -97,14 +97,25 @@ class ProjectProgressViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class AddFeedbackView(APIView):
-    """POST /api/v1/progress/reports/{id}/feedback/ — Giảng viên thêm nhận xét báo cáo tiến độ."""
+    """POST /api/v1/progress/reports/{id}/feedback/ — Giảng viên thêm nhận xét báo cáo tiến độ.
+    Chỉ GV hướng dẫn đề tài (proposed_by) hoặc Admin mới được phép nhận xét.
+    """
     permission_classes = (IsAuthenticated, IsTeacher)
 
     def post(self, request, pk=None):
         try:
-            report = ProgressReport.objects.get(pk=pk)
+            report = ProgressReport.objects.select_related(
+                "assignment__topic__proposed_by"
+            ).get(pk=pk)
         except ProgressReport.DoesNotExist:
             raise Http404("Không tìm thấy báo cáo tiến độ.")
+
+        # Kiểm tra quyền: chỉ GV hướng dẫn đề tài đó hoặc Admin mới được nhận xét
+        topic_teacher = report.assignment.topic.proposed_by
+        if request.user.role != "admin" and (topic_teacher is None or topic_teacher.id != request.user.id):
+            raise PermissionDenied(
+                "Chỉ giảng viên hướng dẫn đề tài này mới được thêm nhận xét tiến độ."
+            )
 
         serializer = ProgressFeedbackCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

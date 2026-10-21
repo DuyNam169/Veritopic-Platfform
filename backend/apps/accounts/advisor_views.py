@@ -153,6 +153,43 @@ class AdvisorRequestViewSet(viewsets.ModelViewSet):
             "request": AdvisorRequestSerializer(req).data,
         })
 
+    @action(detail=False, methods=["get"], url_path="my-advisees")
+    def my_advisees(self, request):
+        """Giảng viên lấy danh sách SV đã chọn mình làm GVHD (AdvisorRequest accepted)."""
+        if request.user.role not in ("teacher", "department_head", "admin"):
+            return Response({"detail": "Chỉ giảng viên mới có thể xem danh sách này."}, status=403)
+
+        search = request.query_params.get("search", "").casefold()
+        reqs = AdvisorRequest.objects.filter(
+            teacher=request.user,
+            status=AdvisorRequest.Status.ACCEPTED,
+        ).select_related(
+            "student", "student__cohort", "student__department",
+        ).order_by("-updated_at")
+
+        data = []
+        for req in reqs:
+            sv = req.student
+            name = sv.get_full_name() or sv.username
+            if search and search not in f"{name} {sv.student_code} {sv.class_name}".casefold():
+                continue
+            data.append({
+                "advisor_request_id": req.pk,
+                "accepted_at": req.updated_at,
+                "student_id": sv.pk,
+                "student_name": name,
+                "student_code": sv.student_code,
+                "class_name": sv.class_name,
+                "email": sv.email,
+                "phone_number": sv.phone_number,
+                "cohort_id": sv.cohort_id,
+                "cohort_name": sv.cohort.name if sv.cohort else "",
+                "department_id": sv.department_id,
+                "department_name": sv.department.name if sv.department else "",
+                "message": req.message,
+            })
+        return Response(data)
+
     @action(detail=False, methods=["get"], url_path="teachers")
     def available_teachers(self, request):
         """Danh sách Giảng viên để sinh viên chọn gửi yêu cầu."""
@@ -194,3 +231,4 @@ class AdvisorRequestViewSet(viewsets.ModelViewSet):
                 "active_student_count": student_count,
             })
         return Response(data)
+

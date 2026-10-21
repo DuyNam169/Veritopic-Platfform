@@ -11,6 +11,8 @@ export interface UserDetail {
   student_code?: string;
   class_name?: string;
   phone_number?: string;
+  /** ID khóa học — dùng để kiểm tra cùng khóa với đề tài khi giao */
+  cohort?: number | null;
 }
 
 export interface Topic {
@@ -30,14 +32,21 @@ export interface Topic {
   teacher_name?: string;
   department_name?: string;
   field_name?: string;
+  cohort_name?: string;
   academic_year_name?: string;
   semester_name?: string;
+  assignment_count?: number;
+  /** True nếu đề tài đang có assignment active — dùng để ẩn/đổi nút "Giao Đề Tài" */
+  is_assigned?: boolean;
+  /** ID của assignment active đầu tiên (nếu có) — dùng để link sang trang tiến độ */
+  active_assignment_id?: number | null;
   status: TopicStatus;
   reviewed_by?: number | null;
   review_note: string;
   created_at: string;
   updated_at: string;
 }
+
 
 export interface SimilarTopicResult {
   topic: Topic;
@@ -68,8 +77,52 @@ export interface MyStudentItem {
   student_name: string;
   email: string;
   phone_number: string;
+  cohort_id?: number | null;
+  cohort_name?: string;
+  department_id?: number | null;
+  department_name?: string;
   latest_percent: number;
   latest_submitted_at: string | null;
+}
+
+export interface MyAdviseeItem {
+  advisor_request_id: number;
+  accepted_at: string;
+  student_id: number;
+  student_name: string;
+  student_code: string;
+  class_name: string;
+  email: string;
+  phone_number: string;
+  cohort_id?: number;
+  cohort_name: string;
+  department_id?: number;
+  department_name: string;
+  message: string;
+}
+
+export interface UnifiedAdviseeStudent {
+  student_id: number;
+  student_name: string;
+  student_code: string;
+  class_name: string;
+  email: string;
+  phone_number?: string;
+  cohort_id?: number;
+  cohort_name?: string;
+  department_id?: number;
+  department_name?: string;
+  has_topic: boolean;
+  topic_id?: number;
+  topic_title?: string;
+  assignment_id?: number;
+  assignment_status?: string;
+  assignment_status_display?: string;
+  latest_percent?: number;
+  due_date?: string | null;
+  advisor_request_id?: number;
+  accepted_at?: string;
+  message?: string;
 }
 
 export interface ProjectProgressItem {

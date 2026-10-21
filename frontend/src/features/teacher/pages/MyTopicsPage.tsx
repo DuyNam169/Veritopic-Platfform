@@ -324,23 +324,35 @@ export const MyTopicsPage: React.FC = () => {
                       </button>
 
                       {activeTab === "mine" && t.status === "approved" && (
-                        <button
-                          onClick={() => setSelectedTopicForAssign(t)}
-                          className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
-                        >
-                          Giao Đề Tài
-                        </button>
+                        t.is_assigned ? (
+                          /* Đề tài đã được giao — hiện nút xem assignment */
+                          <Link
+                            to={`/teacher/progress/${t.active_assignment_id}`}
+                            className="ml-2 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700 hover:bg-sky-100 inline-flex items-center gap-1"
+                          >
+                            <span>👥 Xem Assignment</span>
+                          </Link>
+                        ) : (
+                          /* Chưa giao — hiện nút giao đề tài */
+                          <button
+                            onClick={() => setSelectedTopicForAssign(t)}
+                            className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
+                          >
+                            Giao Đề Tài
+                          </button>
+                        )
                       )}
 
-                      {activeTab === "mine" && t.status === "rename_requested" && (
+                      {activeTab === "mine" && (t.status === "rename_requested" || t.status === "pending") && (
                         <Link
                           to={`/teacher/topics/${t.id}/edit`}
                           className="ml-2 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100"
                         >
-                          Sửa tên
+                          Chỉnh sửa
                         </Link>
                       )}
                     </td>
+
                   </tr>
                 ))}
               </tbody>
