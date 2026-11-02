@@ -1,5 +1,5 @@
 import StudentClassSelect from "@/features/academics/components/StudentClassSelect";
-import { useMemo, useState, type FormEvent, type InputHTMLAttributes } from "react";
+import { forwardRef, useMemo, useState, type FormEvent, type InputHTMLAttributes } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import axios from "axios";
@@ -597,16 +597,16 @@ function CreateUserDialog({
         </header>
 
         <div className="grid gap-4 p-6 sm:grid-cols-2">
-          <Input label="Họ & tên đệm" {...register("last_name", { required: true })} />
-          <Input label="Tên" {...register("first_name", { required: true })} />
-          <Input label="Tên đăng nhập" {...register("username", { required: true })} />
-          <Input label="Email trường" type="email" {...register("email", { required: true })} />
+          <Input label="Họ & tên đệm" {...register("last_name", { required: "Vui lòng nhập họ và tên đệm." })} />
+          <Input label="Tên" {...register("first_name", { required: "Vui lòng nhập tên." })} />
+          <Input label="Tên đăng nhập" {...register("username", { required: "Vui lòng nhập tên đăng nhập." })} />
+          <Input label="Email trường" type="email" {...register("email", { required: "Vui lòng nhập email trường." })} />
           <Input label="Số điện thoại" {...register("phone_number")} />
           <Input
             label="Mật khẩu ban đầu"
             type="password"
             placeholder="Tối thiểu 8 ký tự"
-            {...register("password", { required: true, minLength: 8 })}
+            {...register("password", { required: "Vui lòng nhập mật khẩu ban đầu.", minLength: { value: 8, message: "Mật khẩu ban đầu phải có tối thiểu 8 ký tự." } })}
           />
           <label className="text-sm font-medium text-slate-800">
             Vai trò
@@ -634,7 +634,7 @@ function CreateUserDialog({
           {selectedRole === "student" && (
             <>
               <Input label="Mã sinh viên" {...register("student_code")} />
-              <Controller control={control} name="student_class" rules={{ required: true }} render={({ field }) => <StudentClassSelect value={field.value} department={watch("department")} cohort={watch("cohort")} onChange={(item) => { field.onChange(item?.id ?? null); if (item?.cohort) setValue("cohort", item.cohort); if (item?.department) setValue("department", item.department); }} />} />
+              <Controller control={control} name="student_class" rules={{ required: "Vui lòng chọn lớp trong danh mục." }} render={({ field }) => <StudentClassSelect value={field.value} department={watch("department")} cohort={watch("cohort")} onChange={(item) => { field.onChange(item?.id ?? null); if (item?.cohort) setValue("cohort", item.cohort); if (item?.department) setValue("department", item.department); }} />} />
               <label className="text-sm font-medium text-slate-800">
                 Khóa học
                 <select
@@ -654,9 +654,9 @@ function CreateUserDialog({
         </div>
 
         {Object.keys(errors).length > 0 && (
-          <div className="mx-6 mb-2 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs text-rose-800 font-medium">
+          <div role="alert" className="mx-6 mb-2 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs text-rose-800 font-medium">
             <ShieldAlert className="w-4 h-4 shrink-0" />
-            <span>Vui lòng điền đầy đủ các trường và mật khẩu tối thiểu 8 ký tự.</span>
+            <span>{Object.values(errors).map((error) => error.message).filter(Boolean).join(" ")}</span>
           </div>
         )}
 
@@ -846,14 +846,15 @@ function ResetPasswordDialog({ user, close }: { user: ManagedUser; close: () => 
   );
 }
 
-function Input({ label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { label: string }>(function Input({ label, ...props }, ref) {
   return (
     <label className="text-sm font-medium text-slate-800">
       {label}
       <input
         {...props}
+        ref={ref}
         className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
       />
     </label>
   );
-}
+});
