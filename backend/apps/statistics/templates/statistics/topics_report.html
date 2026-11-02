@@ -3,16 +3,77 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  @page { size: A4 landscape; margin: 14mm; @bottom-right { content: "Trang " counter(page) "/" counter(pages); font-size: 9px; color: #64748b; } }
-  body { font-family: "DejaVu Sans", sans-serif; font-size: 9px; color: #0f172a; }
-  h1 { margin: 0 0 6px; font-size: 18px; text-align: center; color: #1e3a8a; }
-  .meta { margin: 2px 0; color: #475569; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; table-layout: fixed; }
-  th, td { border: 1px solid #94a3b8; padding: 5px 6px; text-align: left; overflow-wrap: anywhere; }
-  th { background-color: #2563eb; color: white; text-align: center; }
-  tbody tr:nth-child(even) { background-color: #f8fafc; }
-  .empty { padding: 18px; text-align: center; color: #64748b; font-style: italic; }
-  .id { width: 4%; } .title { width: 25%; } .compact { width: 10%; } .teacher { width: 15%; } .status { width: 11%; }
+  @page {
+    size: A4 landscape;
+    margin: 10mm 12mm;
+    @bottom-right {
+      content: "Trang " counter(page) "/" counter(pages);
+      font-size: 8pt;
+      color: #64748b;
+      font-family: "Times New Roman", "DejaVu Serif", serif;
+    }
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: "Times New Roman", "DejaVu Serif", serif;
+    font-size: 8pt;
+    color: #0f172a;
+    margin: 0;
+    padding: 0;
+    line-height: 1.3;
+  }
+  h1 {
+    margin: 0 0 6px;
+    font-size: 14pt;
+    text-align: center;
+    color: #1e3a8a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .meta {
+    margin: 2px 0;
+    font-size: 8.5pt;
+    color: #334155;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    table-layout: fixed;
+  }
+  th, td {
+    border: 1px solid #94a3b8;
+    padding: 4px 4px;
+    font-size: 8pt;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    word-wrap: break-word;
+    vertical-align: middle;
+  }
+  th {
+    background-color: #1e40af;
+    color: #ffffff;
+    text-align: center;
+    font-weight: bold;
+  }
+  tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+  .empty {
+    padding: 16px;
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+  }
+  .text-center { text-align: center; }
+  .text-left { text-align: left; }
+  .font-bold { font-weight: bold; }
+  .tag-late { color: #dc2626; font-size: 7pt; font-weight: bold; margin-top: 2px; }
+  .tag-pending { color: #d97706; font-size: 7pt; font-weight: bold; margin-top: 2px; }
+  .tag-ok { color: #16a34a; font-size: 7pt; margin-top: 2px; }
+  .tag-none { color: #64748b; font-size: 7pt; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -20,28 +81,108 @@
   <p class="meta"><strong>Thời điểm xuất:</strong> {{ generated_at }}</p>
   <p class="meta"><strong>Phạm vi dữ liệu:</strong> {{ filter_summary }}</p>
   <table>
+    <colgroup>
+      <col style="width: 3.5%;">
+      <col style="width: 25.0%;">
+      <col style="width: 12.5%;">
+      <col style="width: 11.5%;">
+      <col style="width: 5.5%;">
+      <col style="width: 8.0%;">
+      <col style="width: 7.0%;">
+      <col style="width: 13.5%;">
+      <col style="width: 13.5%;">
+    </colgroup>
     <thead>
       <tr>
-        <th class="id">ID</th><th class="title">Tên đề tài</th><th class="compact">Bộ môn</th><th class="compact">Lĩnh vực</th><th class="compact">Khóa</th><th class="compact">Năm học</th><th class="compact">Học kỳ</th><th class="teacher">GVHD</th><th class="status">Trạng thái</th>
+        <th>ID</th>
+        <th>Tên đề tài</th>
+        <th>Bộ môn</th>
+        <th>Lĩnh vực</th>
+        <th>Khóa</th>
+        <th>Năm học</th>
+        <th>Học kỳ</th>
+        <th>GVHD</th>
+        <th>Trạng thái</th>
       </tr>
     </thead>
     <tbody>
       {% for t in topics %}
       <tr>
-        <td>{{ t.id }}</td>
-        <td>{{ t.title }}</td>
-        <td>{{ t.department.name }}</td>
-        <td>{{ t.field.name|default:"Chưa phân loại" }}</td>
-        <td>{{ t.cohort.name }}</td>
-        <td>{{ t.academic_year.name }}</td>
-        <td>{{ t.semester.name }}</td>
-        <td>{{ t.proposed_by.get_full_name|default:t.proposed_by.username }}</td>
-        <td>{{ t.get_status_display }}</td>
+        <td class="text-center">{{ t.id }}</td>
+        <td class="text-left">{{ t.title }}</td>
+        <td class="text-left">{{ t.department.name }}</td>
+        <td class="text-left">{{ t.field.name|default:"Chưa phân loại" }}</td>
+        <td class="text-center">{{ t.cohort.name }}</td>
+        <td class="text-center">{{ t.academic_year.name }}</td>
+        <td class="text-center">{{ t.semester.name }}</td>
+        <td class="text-left">{{ t.proposed_by.get_full_name|default:t.proposed_by.username }}</td>
+        <td class="text-center">{{ t.get_status_display }}</td>
       </tr>
       {% empty %}
       <tr><td class="empty" colspan="9">Không có đề tài phù hợp với điều kiện lọc.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+
+  {% if students %}
+  <div style="page-break-before: always; margin-top: 20px;"></div>
+  <h1>DANH SÁCH SINH VIÊN HƯỚNG DẪN & TIẾN ĐỘ ĐỒ ÁN</h1>
+  <p class="meta"><strong>Thời điểm xuất:</strong> {{ generated_at }}</p>
+  <p class="meta"><strong>Phạm vi dữ liệu:</strong> {{ filter_summary }}</p>
+  <table>
+    <colgroup>
+      <col style="width: 3.5%;">
+      <col style="width: 9.5%;">
+      <col style="width: 15.0%;">
+      <col style="width: 8.5%;">
+      <col style="width: 5.5%;">
+      <col style="width: 12.0%;">
+      <col style="width: 28.0%;">
+      <col style="width: 6.5%;">
+      <col style="width: 11.5%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Mã SV</th>
+        <th>Họ và tên</th>
+        <th>Lớp</th>
+        <th>Khóa</th>
+        <th>Bộ môn</th>
+        <th>Đề tài đồ án</th>
+        <th>Tiến độ</th>
+        <th>Trạng thái</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in students %}
+      <tr>
+        <td class="text-center">{{ forloop.counter }}</td>
+        <td class="text-center">{{ s.student_code }}</td>
+        <td class="text-left"><strong>{{ s.student_name }}</strong></td>
+        <td class="text-center">{{ s.class_name }}</td>
+        <td class="text-center">{{ s.cohort_name }}</td>
+        <td class="text-left">{{ s.department_name }}</td>
+        <td class="text-left">{{ s.topic_title|default:"Chưa giao đề tài" }}</td>
+        <td class="text-center font-bold">{{ s.latest_percent }}%</td>
+        <td class="text-center">
+          <div>{{ s.assignment_status_display }}</div>
+          {% if s.is_late %}
+            <div class="tag-late">Trễ hạn nộp</div>
+          {% elif s.has_pending_feedback %}
+            <div class="tag-pending">Chờ GV nhận xét</div>
+          {% elif s.reports_count > 0 %}
+            <div class="tag-ok">Đúng tiến độ</div>
+          {% else %}
+            <div class="tag-none">Chưa có báo cáo</div>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td class="empty" colspan="9">Chưa có sinh viên hướng dẫn.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </body>
 </html>

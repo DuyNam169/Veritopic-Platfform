@@ -58,6 +58,9 @@ class TopicViewSet(viewsets.ModelViewSet):
             qs = qs.filter(department_id=user.department_id) if user.department_id else qs.none()
         if self.request.query_params.get("mine") in ("true", "1"):
             qs = qs.filter(proposed_by=user)
+        elif user.role == "student":
+            # Sinh viên xem danh mục đề tài chỉ thấy các đề tài đã được phê duyệt
+            qs = qs.filter(status=Topic.Status.APPROVED)
         return qs
 
     @action(detail=False, methods=["post"], url_path="check-title", permission_classes=[IsTeacher])

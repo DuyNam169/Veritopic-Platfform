@@ -34,6 +34,17 @@ class StudentFeaturesTestCase(TestCase):
             department=self.dept,
         )
 
+        # Trưởng bộ môn
+        self.hod = User.objects.create_user(
+            username="truong_bomon",
+            password="Password@123",
+            role="department_head",
+            first_name="Trần",
+            last_name="Trưởng Khoa",
+            email="hod@example.com",
+            department=self.dept,
+        )
+
         # Sinh viên 1 (K65)
         self.student1 = User.objects.create_user(
             username="sv_k65_01",
@@ -126,7 +137,7 @@ class StudentFeaturesTestCase(TestCase):
         notif = Notification.objects.filter(recipient=self.teacher, notification_type="topic_proposal").first()
         self.assertIsNotNone(notif)
 
-        # Giảng viên phê duyệt đề tài
+        # Giảng viên đồng ý đề xuất -> Chuyển Trưởng bộ môn duyệt
         proposal_id = res.data["id"]
         self.client.force_authenticate(user=self.teacher)
         resp_res = self.client.post(f"/api/v1/topics/student-proposals/{proposal_id}/respond/", {
@@ -134,17 +145,41 @@ class StudentFeaturesTestCase(TestCase):
             "teacher_note": "Đề tài có tính thực tiễn cao, thầy thông qua.",
         })
         self.assertEqual(resp_res.status_code, 200)
-        self.assertEqual(resp_res.data["status"], "approved")
+        self.assertEqual(resp_res.data["status"], "waiting_approval")
 
-        # Kiểm tra Topic đã được tạo với created_by là sinh viên
+        # Kiểm tra Topic đã được tạo với status PENDING
         created_topic_id = resp_res.data["created_topic"]
         self.assertIsNotNone(created_topic_id)
         created_topic = Topic.objects.get(pk=created_topic_id)
         self.assertEqual(created_topic.created_by, self.student1)
+        self.assertEqual(created_topic.status, Topic.Status.PENDING)
 
-        # Kiểm tra sinh viên được tự động gán vào đề tài
+        # Đề tài CHƯA được gán assignment cho sinh viên khi chưa qua bước Trưởng bộ môn duyệt
+        self.assertFalse(TopicAssignment.objects.filter(topic=created_topic, students=self.student1).exists())
+
+        # Sinh viên tra cứu danh mục đề tài không thấy đề tài pending này
+        self.client.force_authenticate(user=self.student1)
+        topics_res = self.client.get("/api/v1/topics/topics/")
+        topic_ids = [t["id"] for t in topics_res.data["results"]]
+        self.assertNotIn(created_topic.id, topic_ids)
+
+        # Trưởng bộ môn phê duyệt đề tài
+        self.client.force_authenticate(user=self.hod)
+        approve_res = self.client.post(f"/api/v1/management/topics/{created_topic_id}/approve/", {
+            "note": "Trưởng bộ môn phê duyệt đề tài sinh viên đề xuất.",
+        })
+        self.assertEqual(approve_res.status_code, 200)
+
+        created_topic.refresh_from_db()
+        self.assertEqual(created_topic.status, Topic.Status.APPROVED)
+
+        # Sau khi Trưởng bộ môn duyệt, proposal cập nhật approved và sinh viên ĐƯỢC gán assignment
+        proposal = StudentTopicProposal.objects.get(pk=proposal_id)
+        self.assertEqual(proposal.status, StudentTopicProposal.Status.APPROVED)
+
         assignment = TopicAssignment.objects.filter(topic=created_topic, students=self.student1).first()
         self.assertIsNotNone(assignment)
+        self.assertEqual(assignment.status, TopicAssignment.Status.ACTIVE)
 
     def test_rule_one_student_can_only_choose_one_topic(self):
         """Quy tắc: 1 sinh viên chỉ được chọn 1 đề tài đồ án."""

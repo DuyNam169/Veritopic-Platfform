@@ -56,8 +56,14 @@ class StudentTopicProposalViewSet(viewsets.ModelViewSet):
         if TopicAssignment.objects.filter(students=user, status="active").exists():
             raise ValidationError({"detail": "Bạn đã có một đề tài đồ án đang thực hiện, không thể đề xuất thêm."})
 
-        if StudentTopicProposal.objects.filter(student=user, status=StudentTopicProposal.Status.PENDING).exists():
-            raise ValidationError({"detail": "Bạn đã có một đề xuất đề tài đang chờ giảng viên xử lý. Vui lòng chờ phản hồi."})
+        if StudentTopicProposal.objects.filter(
+            student=user,
+            status__in=[
+                StudentTopicProposal.Status.PENDING,
+                StudentTopicProposal.Status.WAITING_APPROVAL,
+            ]
+        ).exists():
+            raise ValidationError({"detail": "Bạn đã có một đề xuất đề tài đang chờ xử lý hoặc đang chờ Trưởng bộ môn duyệt. Vui lòng chờ phản hồi."})
 
         create_serializer = StudentTopicProposalCreateSerializer(data=self.request.data)
         create_serializer.is_valid(raise_exception=True)
@@ -85,7 +91,7 @@ class StudentTopicProposalViewSet(viewsets.ModelViewSet):
                 title="Đề xuất đề tài đồ án mới từ sinh viên",
                 message=f"Sinh viên {user.get_full_name() or user.username} ({user.student_code or 'N/A'}) đã đề xuất đề tài: '{proposal.title}'. Vui lòng xem xét.",
                 notification_type=Notification.NotificationType.TOPIC_PROPOSAL,
-                link="/teacher/student-requests",
+                link="/teacher/student-requests?tab=proposals",
             )
             self._created_instance = proposal
 
@@ -116,7 +122,7 @@ class StudentTopicProposalViewSet(viewsets.ModelViewSet):
                 if TopicAssignment.objects.filter(students=proposal.student, status="active").exists():
                     raise ValidationError({"detail": "Sinh viên này đã có đề tài đồ án khác đang thực hiện."})
 
-                # Tạo Topic chính thức gửi lên Trưởng bộ môn
+                # Tạo Topic chính thức gửi lên Trưởng bộ môn phê duyệt (chưa gán assignment ngay)
                 topic = Topic.objects.create(
                     title=proposal.title,
                     description=proposal.description,
@@ -131,34 +137,34 @@ class StudentTopicProposalViewSet(viewsets.ModelViewSet):
                 )
                 propose_topic(topic, actor=request.user)
 
-                # Tự động gán sinh viên vào đề tài này
-                assignment = TopicAssignment.objects.create(
-                    topic=topic,
-                    assigned_by=request.user,
-                    note="Đề tài do sinh viên đề xuất và được GVHD chấp thuận.",
-                )
-                assignment.students.set([proposal.student])
-
-                proposal.status = StudentTopicProposal.Status.APPROVED
+                proposal.status = StudentTopicProposal.Status.WAITING_APPROVAL
                 proposal.teacher_note = teacher_note
                 proposal.created_topic = topic
                 proposal.save(update_fields=["status", "teacher_note", "created_topic", "updated_at"])
-
-                # Hủy các đăng ký đề tài khác đang chờ của sinh viên này
-                TopicRegistration.objects.filter(
-                    student=proposal.student,
-                    status=TopicRegistration.Status.PENDING,
-                ).update(status=TopicRegistration.Status.CANCELLED)
 
                 note_info = f" Ghi chú: {teacher_note}" if teacher_note else ""
                 Notification.objects.create(
                     recipient=proposal.student,
                     sender=request.user,
-                    title="Đề xuất đề tài đã được GVHD duyệt",
+                    title="Đề xuất đề tài đã được GVHD thông qua",
                     message=f"Giảng viên {request.user.get_full_name() or request.user.username} đã chấp thuận đề tài '{proposal.title}' và chuyển lên Trưởng bộ môn phê duyệt.{note_info}",
                     notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
-                    link="/projects",
+                    link="/student/propose",
                 )
+
+                # Thông báo cho Trưởng bộ môn
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                dept_heads = User.objects.filter(role="department_head", department=proposal.department, is_active=True)
+                for head in dept_heads:
+                    Notification.objects.create(
+                        recipient=head,
+                        sender=request.user,
+                        title="Đề tài mới chờ phê duyệt",
+                        message=f"Giảng viên {request.user.get_full_name() or request.user.username} đã gửi đề tài '{proposal.title}' (sinh viên {proposal.student.get_full_name() or proposal.student.username} đề xuất) chờ bạn phê duyệt.",
+                        notification_type=Notification.NotificationType.TOPIC_PROPOSAL,
+                        link="/approval",
+                    )
             elif action_type == "revision_requested":
                 proposal.status = StudentTopicProposal.Status.REVISION_REQUESTED
                 proposal.teacher_note = teacher_note
@@ -170,7 +176,7 @@ class StudentTopicProposalViewSet(viewsets.ModelViewSet):
                     title="Yêu cầu chỉnh sửa đề xuất đề tài",
                     message=f"Giảng viên {request.user.get_full_name() or request.user.username} yêu cầu bạn chỉnh sửa đề tài '{proposal.title}'. Nhận xét: {teacher_note}",
                     notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
-                    link="/student/proposals",
+                    link="/student/propose",
                 )
             else:
                 proposal.status = StudentTopicProposal.Status.REJECTED
@@ -184,7 +190,7 @@ class StudentTopicProposalViewSet(viewsets.ModelViewSet):
                     title="Đề xuất đề tài bị từ chối",
                     message=f"Giảng viên {request.user.get_full_name() or request.user.username} đã từ chối đề tài '{proposal.title}'.{reason_info}",
                     notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
-                    link="/student/proposals",
+                    link="/student/propose",
                 )
 
         return Response(StudentTopicProposalSerializer(proposal).data)
@@ -235,8 +241,14 @@ class TopicRegistrationViewSet(viewsets.ModelViewSet):
         if TopicRegistration.objects.filter(student=user, status__in=[TopicRegistration.Status.PENDING, TopicRegistration.Status.APPROVED]).exists():
             raise ValidationError({"detail": "Bạn đã có một yêu cầu đăng ký đề tài đang chờ xử lý hoặc đã duyệt."})
 
-        if StudentTopicProposal.objects.filter(student=user, status=StudentTopicProposal.Status.PENDING).exists():
-            raise ValidationError({"detail": "Bạn đang có đề xuất đề tài chờ giảng viên duyệt, không thể đăng ký đề tài khác."})
+        if StudentTopicProposal.objects.filter(
+            student=user,
+            status__in=[
+                StudentTopicProposal.Status.PENDING,
+                StudentTopicProposal.Status.WAITING_APPROVAL,
+            ]
+        ).exists():
+            raise ValidationError({"detail": "Bạn đang có đề xuất đề tài đang chờ xử lý hoặc chờ Trưởng bộ môn duyệt, không thể đăng ký đề tài khác."})
 
         # -------------------------------------------------------------
         # QUY TẮC 2: Không sinh viên nào cùng khóa chọn chung 1 đề tài
@@ -278,7 +290,7 @@ class TopicRegistrationViewSet(viewsets.ModelViewSet):
                 title="Đăng ký đề tài mới từ sinh viên",
                 message=f"Sinh viên {user.get_full_name() or user.username} ({user.student_code or 'N/A'}) khóa {cohort_name} đã đăng ký thực hiện đề tài '{topic.title}'.",
                 notification_type=Notification.NotificationType.TOPIC_REGISTRATION,
-                link="/teacher/student-requests",
+                link="/teacher/student-requests?tab=registrations",
             )
             self._created_instance = reg
 
@@ -328,6 +340,28 @@ class TopicRegistrationViewSet(viewsets.ModelViewSet):
                     },
                 )
                 assignment.students.add(reg.student)
+
+                # Đồng bộ và xác nhận quan hệ Giảng viên hướng dẫn
+                from apps.accounts.models import AdvisorRequest
+                AdvisorRequest.objects.filter(
+                    student=reg.student,
+                    status=AdvisorRequest.Status.PENDING,
+                ).update(status=AdvisorRequest.Status.CANCELLED)
+
+                teacher = reg.topic.proposed_by or request.user
+                adv_req, _ = AdvisorRequest.objects.get_or_create(
+                    student=reg.student,
+                    teacher=teacher,
+                    defaults={
+                        "status": AdvisorRequest.Status.ACCEPTED,
+                        "message": f"Đăng ký đề tài: {reg.topic.title}",
+                        "response_note": f"Chấp thuận đăng ký đề tài. {teacher_note}".strip(),
+                    },
+                )
+                if adv_req.status != AdvisorRequest.Status.ACCEPTED:
+                    adv_req.status = AdvisorRequest.Status.ACCEPTED
+                    adv_req.response_note = f"Chấp thuận đăng ký đề tài. {teacher_note}".strip()
+                    adv_req.save(update_fields=["status", "response_note", "updated_at"])
 
                 TopicHistory.objects.create(
                     topic=reg.topic,
@@ -410,7 +444,11 @@ class TopicRegistrationViewSet(viewsets.ModelViewSet):
         # 3. Pending or revision proposal
         pending_prop = StudentTopicProposal.objects.filter(
             student=user,
-            status__in=[StudentTopicProposal.Status.PENDING, StudentTopicProposal.Status.REVISION_REQUESTED],
+            status__in=[
+                StudentTopicProposal.Status.PENDING,
+                StudentTopicProposal.Status.WAITING_APPROVAL,
+                StudentTopicProposal.Status.REVISION_REQUESTED,
+            ],
         ).select_related("teacher", "department").first()
 
         has_topic = active_assignment is not None

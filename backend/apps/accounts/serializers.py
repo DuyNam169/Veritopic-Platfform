@@ -55,10 +55,6 @@ class AcademicProfileValidationMixin:
 
 
 class UserSerializer(serializers.ModelSerializer):
-    def validate(self, attrs):
-        validate_student_class(attrs, self.instance)
-        return attrs
-
     def update(self, instance, validated_data):
         # A profile edit must not overwrite academic fields changed concurrently.
         for field, value in validated_data.items():
@@ -72,12 +68,12 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "username", "email", "first_name", "last_name",
             "role", "avatar", "phone_number", "department", "cohort", "student_code",
-            "class_name", "student_class", "created_at", "last_login",
+            "class_name", "created_at", "last_login",
             "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
         )
         # This serializer is also used by /auth/me/.  Never let a user change
         # their own role (or any other account's password) through that route.
-        read_only_fields = ("class_name", "id", "role", "department", "cohort", "student_code", "created_at", "last_login", "username", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status")
+        read_only_fields = ("id", "role", "department", "cohort", "student_code", "created_at", "last_login", "username", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status")
 
     def validate_email(self, value):
         existing = User.objects.filter(email__iexact=value).exclude(pk=self.instance.pk if self.instance else None)

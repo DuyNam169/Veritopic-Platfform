@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { studentApi } from "@/features/student/api";
 import type { AdvisorRequestItem, StudentTopicProposalItem, TopicRegistrationItem } from "@/features/student/types";
@@ -15,7 +16,25 @@ import {
 
 export const StudentRequestsPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"advisors" | "proposals" | "registrations">("advisors");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+
+  const [activeTab, setActiveTab] = useState<"advisors" | "proposals" | "registrations">(
+    tabParam === "proposals" || tabParam === "registrations" || tabParam === "advisors"
+      ? tabParam
+      : "advisors"
+  );
+
+  useEffect(() => {
+    if (tabParam === "proposals" || tabParam === "registrations" || tabParam === "advisors") {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: "advisors" | "proposals" | "registrations") => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   // Advisor Modal
   const [targetAdvisorReq, setTargetAdvisorReq] = useState<{
@@ -80,7 +99,7 @@ export const StudentRequestsPage: React.FC = () => {
       teacher_note?: string;
     }) => studentApi.respondStudentProposal(id, { action, teacher_note }),
     onSuccess: () => {
-      toast.success("Đã xử lý đề xuất đề tài của sinh viên thành công!");
+      toast.success("Đã phản hồi đề xuất đề tài của sinh viên thành công!");
       setTargetProposal(null);
       setProposalNote("");
       void queryClient.invalidateQueries({ queryKey: ["teacher-student-proposals"] });
@@ -126,7 +145,7 @@ export const StudentRequestsPage: React.FC = () => {
       {/* Tabs */}
       <div className="flex border-b border-slate-200 gap-4 text-xs font-semibold">
         <button
-          onClick={() => setActiveTab("advisors")}
+          onClick={() => handleTabChange("advisors")}
           className={`pb-3 px-2 flex items-center gap-2 border-b-2 transition ${
             activeTab === "advisors"
               ? "border-[#006A60] text-[#006A60]"
@@ -142,7 +161,7 @@ export const StudentRequestsPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab("proposals")}
+          onClick={() => handleTabChange("proposals")}
           className={`pb-3 px-2 flex items-center gap-2 border-b-2 transition ${
             activeTab === "proposals"
               ? "border-[#006A60] text-[#006A60]"
@@ -158,7 +177,7 @@ export const StudentRequestsPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab("registrations")}
+          onClick={() => handleTabChange("registrations")}
           className={`pb-3 px-2 flex items-center gap-2 border-b-2 transition ${
             activeTab === "registrations"
               ? "border-[#006A60] text-[#006A60]"
@@ -316,7 +335,11 @@ export const StudentRequestsPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {prop.status === "approved" ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle className="w-3.5 h-3.5" /> Đã chấp thuận
+                            <CheckCircle className="w-3.5 h-3.5" /> Đã phê duyệt chính thức
+                          </span>
+                        ) : prop.status === "waiting_approval" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                            <Clock className="w-3.5 h-3.5" /> Chờ TBM duyệt
                           </span>
                         ) : prop.status === "revision_requested" ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -342,7 +365,7 @@ export const StudentRequestsPage: React.FC = () => {
                               }}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#006A60] text-white hover:bg-[#00524a] transition shadow-xs"
                             >
-                              Duyệt & Giao SV
+                              Duyệt & Gửi TBM
                             </button>
                             <button
                               onClick={() => {
@@ -534,7 +557,7 @@ export const StudentRequestsPage: React.FC = () => {
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 animate-scale-in">
             <h3 className="font-bold text-slate-900 text-base">
               {targetProposal.action === "approve"
-                ? "Chấp thuận đề tài & Giao cho sinh viên"
+                ? "Duyệt đề xuất & Chuyển Trưởng bộ môn phê duyệt"
                 : targetProposal.action === "revision_requested"
                 ? "Yêu cầu sinh viên chỉnh sửa đề tài"
                 : "Từ chối đề tài của sinh viên"}
@@ -545,6 +568,12 @@ export const StudentRequestsPage: React.FC = () => {
             <p className="text-xs text-slate-500">
               Sinh viên: {targetProposal.item.student_name} ({targetProposal.item.student_code})
             </p>
+
+            {targetProposal.action === "approve" && (
+              <p className="text-[11px] text-teal-800 bg-teal-50 p-2.5 rounded-lg border border-teal-200">
+                Lưu ý: Khi bạn duyệt, đề tài sẽ được gửi lên Trưởng bộ môn phê duyệt. Sau khi Trưởng bộ môn duyệt, đề tài mới chính thức đưa vào danh mục và giao cho sinh viên thực hiện.
+              </p>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">

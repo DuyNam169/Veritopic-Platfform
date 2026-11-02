@@ -6,7 +6,7 @@ import io
 from django.template.loader import render_to_string
 
 
-def export_topics_to_pdf(topics, *, generated_at="", filter_summary="Tất cả đề tài") -> io.BytesIO:
+def export_topics_to_pdf(topics, *, generated_at="", filter_summary="Tất cả đề tài", students=None) -> io.BytesIO:
     try:
         from weasyprint import HTML
     except (ImportError, OSError) as exc:
@@ -17,7 +17,7 @@ def export_topics_to_pdf(topics, *, generated_at="", filter_summary="Tất cả 
 
     html_string = render_to_string(
         "statistics/topics_report.html",
-        {"topics": topics, "generated_at": generated_at, "filter_summary": filter_summary},
+        {"topics": topics, "generated_at": generated_at, "filter_summary": filter_summary, "students": students},
     )
     buffer = io.BytesIO()
     HTML(string=html_string).write_pdf(buffer)

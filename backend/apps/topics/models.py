@@ -252,12 +252,14 @@ class StudentTopicProposal(models.Model):
     """
     Sinh viên đề xuất đề tài mới lên cho Giảng viên hướng dẫn.
     Đề xuất ở trạng thái chờ GVHD xử lý (Đồng ý / Từ chối / Yêu cầu sửa).
-    Khi GVHD đồng ý, một Topic chính thức và TopicAssignment sẽ được khởi tạo.
+    Khi GVHD đồng ý, đề tài được tạo ở trạng thái PENDING và gửi lên Trưởng bộ môn duyệt.
+    Sau khi Trưởng bộ môn duyệt, Topic chuyển sang APPROVED và TopicAssignment được khởi tạo cho sinh viên.
     """
     class Status(models.TextChoices):
         PENDING = "pending", "Chờ GVHD xử lý"
-        APPROVED = "approved", "GVHD đã đồng ý"
-        REJECTED = "rejected", "GVHD từ chối"
+        WAITING_APPROVAL = "waiting_approval", "Chờ Trưởng bộ môn duyệt"
+        APPROVED = "approved", "Đã phê duyệt"
+        REJECTED = "rejected", "Từ chối"
         REVISION_REQUESTED = "revision_requested", "Yêu cầu chỉnh sửa"
 
     student = models.ForeignKey(

@@ -41,13 +41,29 @@ export const NotificationsPage: React.FC = () => {
   const items = filter === "unread" ? allItems.filter((n) => !n.is_read) : allItems;
   const unreadCount = allItems.filter((n) => !n.is_read).length;
 
+  const resolveNotificationLink = (item: NotificationItem): string => {
+    let link = item.link || "/";
+    if (link === "/teacher/student-requests" || link === "/teacher/student-requests/") {
+      if (item.notification_type === "topic_proposal" || item.notification_type === "topic_proposal_response") {
+        link = "/teacher/student-requests?tab=proposals";
+      } else if (item.notification_type === "advisor_request" || item.notification_type === "advisor_response") {
+        link = "/teacher/student-requests?tab=advisors";
+      } else if (item.notification_type === "topic_registration" || item.notification_type === "topic_registration_response") {
+        link = "/teacher/student-requests?tab=registrations";
+      }
+    }
+    if (link === "/student/proposals" || link === "/student/proposals/") {
+      link = "/student/propose";
+    }
+    return link;
+  };
+
   const handleClick = (item: NotificationItem) => {
     if (!item.is_read) {
       markReadMutation.mutate(item.id);
     }
-    if (item.link) {
-      navigate(item.link);
-    }
+    const targetLink = resolveNotificationLink(item);
+    navigate(targetLink);
   };
 
   const getIcon = (type: string) => {

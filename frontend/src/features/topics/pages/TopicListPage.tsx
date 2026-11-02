@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { usersApi } from "@/features/accounts/api";
 import { catalogApi } from "@/features/academics/api";
+import { studentApi } from "@/features/student/api";
 import { useAuthStore } from "@/features/auth/store";
 import { statisticsApi } from "@/features/statistics/api";
 import { Filter, Search } from "@/shared/components/icons";
@@ -20,6 +21,7 @@ const statusOptions = [
 export default function TopicListPage() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === "admin";
+  const canExport = user?.role === "admin" || user?.role === "teacher" || user?.role === "department_head";
   const [filters, setFilters] = useState<TopicListParams>({});
   const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
   const topics = useTopics(filters);
@@ -29,7 +31,15 @@ export default function TopicListPage() {
   const fields = useQuery({ queryKey: ["catalog", "fields"], queryFn: () => catalogApi.list("fields") });
   const semesters = useQuery({ queryKey: ["catalog", "semesters"], queryFn: () => catalogApi.list("semesters") });
   const users = useQuery({ queryKey: ["managed-users"], queryFn: usersApi.list, enabled: isAdmin });
-  const teachers = useMemo(() => (users.data ?? []).filter((item) => item.role === "teacher" || item.role === "department_head"), [users.data]);
+  const availableTeachers = useQuery({ queryKey: ["available-teachers"], queryFn: () => studentApi.getAvailableTeachers(), enabled: canExport });
+  const teachers = useMemo(() => {
+    if (isAdmin && users.data) {
+      return users.data
+        .filter((item) => item.role === "teacher" || item.role === "department_head")
+        .map((item) => ({ id: item.id, label: `${item.first_name} ${item.last_name}`.trim() || item.username }));
+    }
+    return (availableTeachers.data ?? []).map((t) => ({ id: t.id, label: t.name || t.username }));
+  }, [isAdmin, users.data, availableTeachers.data]);
   const currentPage = filters.page ?? 1;
   const totalPages = Math.max(1, Math.ceil((topics.data?.count ?? 0) / 20));
   const firstResult = topics.data?.count ? (currentPage - 1) * 20 + 1 : 0;
@@ -58,7 +68,7 @@ export default function TopicListPage() {
   }
 
   return <div className="mx-auto max-w-7xl space-y-6">
-    <PageHeader eyebrow="Kho dữ liệu học thuật" title="Danh mục đề tài" description="Tìm kiếm và tra cứu đề tài theo nhiều tiêu chí trong toàn hệ thống." actions={isAdmin && <><Button busy={exporting === "excel"} disabled={!!exporting} onClick={() => void download("excel")}>Xuất Excel</Button><Button variant="primary" busy={exporting === "pdf"} disabled={!!exporting} onClick={() => void download("pdf")}>Xuất PDF</Button></>} />
+    <PageHeader eyebrow="Kho dữ liệu học thuật" title="Danh mục đề tài" description="Tìm kiếm và tra cứu đề tài theo nhiều tiêu chí trong toàn hệ thống." actions={canExport && <><Button busy={exporting === "excel"} disabled={!!exporting} onClick={() => void download("excel")}>Xuất Excel</Button><Button variant="primary" busy={exporting === "pdf"} disabled={!!exporting} onClick={() => void download("pdf")}>Xuất PDF</Button></>} />
 
     <Panel>
       <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Filter className="h-4 w-4 text-brand-700" /><h2 className="font-semibold text-slate-900">Bộ lọc danh sách</h2></div>{Object.keys(filters).some((key) => key !== "page") && <button onClick={() => setFilters({})} className="text-sm font-semibold text-brand-700 hover:text-brand-900 hover:underline">Xóa bộ lọc</button>}</div>
@@ -70,7 +80,7 @@ export default function TopicListPage() {
         <FilterSelect label="Lĩnh vực" value={filters.field} onChange={(value) => setFilter("field", value, true)} options={(fields.data ?? []).map((item) => ({ value: item.id, label: item.name }))} />
         <FilterSelect label="Học kỳ" value={filters.semester} onChange={(value) => setFilter("semester", value, true)} options={(semesters.data ?? []).map((item) => ({ value: item.id, label: item.name }))} />
         <label className="text-sm font-medium text-slate-700">Trạng thái<select value={filters.status ?? ""} onChange={(event) => setFilter("status", event.target.value)} className={fieldClass}><option value="">Tất cả trạng thái</option>{statusOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-        {isAdmin && <FilterSelect label="Giảng viên" value={filters.proposed_by} onChange={(value) => setFilter("proposed_by", value, true)} options={teachers.map((item) => ({ value: item.id, label: `${item.first_name} ${item.last_name}`.trim() || item.username }))} />}
+        {canExport && <FilterSelect label="Giảng viên" value={filters.proposed_by} onChange={(value) => setFilter("proposed_by", value, true)} options={teachers.map((item) => ({ value: item.id, label: item.label }))} />}
       </div>
     </Panel>
 

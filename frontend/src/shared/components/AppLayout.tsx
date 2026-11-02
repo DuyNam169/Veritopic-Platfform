@@ -158,6 +158,10 @@ export default function AppLayout() {
                   <ClipboardList className="w-4 h-4 shrink-0" />
                   <span>Tiến độ đồ án</span>
                 </NavLink>
+                <NavLink to="/statistics" className={navLinkClass}>
+                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  <span>Thống kê & báo cáo</span>
+                </NavLink>
               </>
             )}
 
@@ -171,6 +175,12 @@ export default function AppLayout() {
                   <Users className="w-4 h-4 shrink-0" />
                   <span>Giảng viên & sinh viên</span>
                 </NavLink>
+                {user?.role === "department_head" && (
+                  <NavLink to="/statistics" className={navLinkClass}>
+                    <BarChart3 className="w-4 h-4 shrink-0" />
+                    <span>Thống kê & báo cáo</span>
+                  </NavLink>
+                )}
               </>
             )}
 

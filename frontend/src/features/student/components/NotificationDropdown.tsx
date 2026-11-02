@@ -60,14 +60,32 @@ export const NotificationDropdown: React.FC = () => {
   const unreadCount = unreadCountQuery.data ?? 0;
   const notifications = notificationsQuery.data ?? [];
 
+  const resolveNotificationLink = (item: NotificationItem): string => {
+    let link = item.link || "/";
+    // Tự động phân loại tab nếu link chung chung đến trang yêu cầu sinh viên của GV
+    if (link === "/teacher/student-requests" || link === "/teacher/student-requests/") {
+      if (item.notification_type === "topic_proposal" || item.notification_type === "topic_proposal_response") {
+        link = "/teacher/student-requests?tab=proposals";
+      } else if (item.notification_type === "advisor_request" || item.notification_type === "advisor_response") {
+        link = "/teacher/student-requests?tab=advisors";
+      } else if (item.notification_type === "topic_registration" || item.notification_type === "topic_registration_response") {
+        link = "/teacher/student-requests?tab=registrations";
+      }
+    }
+    // Khắc phục route đề xuất đề tài của sinh viên
+    if (link === "/student/proposals" || link === "/student/proposals/") {
+      link = "/student/propose";
+    }
+    return link;
+  };
+
   const handleNotificationClick = (item: NotificationItem) => {
     if (!item.is_read) {
       markReadMutation.mutate(item.id);
     }
     setIsOpen(false);
-    if (item.link) {
-      navigate(item.link);
-    }
+    const targetLink = resolveNotificationLink(item);
+    navigate(targetLink);
   };
 
   const getNotificationIcon = (type: string) => {
