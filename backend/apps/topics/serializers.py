@@ -45,6 +45,7 @@ class TopicAcademicPeriodValidationMixin:
 
 class TopicSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSerializer):
     proposed_by_detail = UserSerializer(source="proposed_by", read_only=True)
+    created_by_detail = UserSerializer(source="created_by", read_only=True)
     department_name = serializers.CharField(source="department.name", read_only=True)
     field_name = serializers.CharField(source="field.name", read_only=True, allow_null=True)
     cohort_name = serializers.CharField(source="cohort.name", read_only=True)
@@ -95,7 +96,7 @@ class TopicSerializer(TopicAcademicPeriodValidationMixin, serializers.ModelSeria
         model = Topic
         fields = (
             "id", "title", "description", "keywords", "max_students", "requirements", "department", "field", "cohort",
-            "academic_year", "semester", "proposed_by", "proposed_by_detail",
+            "academic_year", "semester", "proposed_by", "proposed_by_detail", "created_by_detail",
             "department_name", "field_name", "cohort_name", "academic_year_name",
             "semester_name", "assignment_count", "can_register", "has_my_cohort_registered",
             "is_assigned", "active_assignment_id",

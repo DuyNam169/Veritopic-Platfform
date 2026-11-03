@@ -50,10 +50,52 @@ export default function ApprovalPage() {
     {pending.isLoading ? <PageSkeleton cards={3} />
       : pending.isError ? <ErrorState message="Không tải được danh sách chờ duyệt." retry={() => void pending.refetch()} />
       : (pending.data ?? []).length === 0 ? <EmptyState title="Không có đề tài nào đang chờ duyệt" description="Tất cả đề tài đã được xử lý hoặc phản hồi." icon={<Clock className="h-6 w-6" />} />
-      : <div className="space-y-3">{(pending.data ?? []).map((topic) => <article key={topic.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:border-brand-200 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Chờ duyệt</span><h2 className="font-bold text-slate-900">{topic.title}</h2></div><p className="mt-2 line-clamp-2 text-sm text-slate-500">{topic.description || "Chưa có mô tả chi tiết."}</p><p className="mt-2 text-xs text-slate-400">{topic.department_name} · {topic.proposed_by_detail ? (`${topic.proposed_by_detail.first_name} ${topic.proposed_by_detail.last_name}`.trim() || topic.proposed_by_detail.username) : `#${topic.proposed_by}`}</p></div><Button variant="primary" onClick={() => openReview(topic)}>Xem và xử lý</Button></article>)}</div>}
+      : <div className="space-y-3">{(pending.data ?? []).map((topic) => {
+          const isStudentProposed = topic.created_by_detail?.role === "student" || (!!topic.created_by && topic.created_by !== topic.proposed_by);
+          const studentAuthor = topic.created_by_detail ? `${topic.created_by_detail.first_name} ${topic.created_by_detail.last_name}`.trim() || topic.created_by_detail.username : null;
+          return (
+            <article key={topic.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:border-brand-200 hover:shadow-md sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Chờ duyệt</span>
+                  {isStudentProposed && (
+                    <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-[#006A60]">
+                      Đề xuất từ sinh viên
+                    </span>
+                  )}
+                  <h2 className="font-bold text-slate-900">{topic.title}</h2>
+                </div>
+                <p className="mt-2 line-clamp-2 text-sm text-slate-500">{topic.description || "Chưa có mô tả chi tiết."}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
+                  <span>{topic.department_name}</span>
+                  <span>·</span>
+                  <span>GVHD: {topic.proposed_by_detail ? (`${topic.proposed_by_detail.first_name} ${topic.proposed_by_detail.last_name}`.trim() || topic.proposed_by_detail.username) : `#${topic.proposed_by}`}</span>
+                  {isStudentProposed && studentAuthor && (
+                    <>
+                      <span>·</span>
+                      <span className="text-teal-700 font-medium">SV đề xuất: {studentAuthor} {topic.created_by_detail?.student_code ? `(${topic.created_by_detail.student_code})` : ""}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <Button variant="primary" onClick={() => openReview(topic)}>Xem và xử lý</Button>
+            </article>
+          );
+        })}</div>}
 
     {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><div role="dialog" aria-modal="true" aria-labelledby="review-topic-title" className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-scale-in">
       <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-amber-700">Đề tài chờ duyệt</p><h2 id="review-topic-title" className="mt-1 text-xl font-bold text-slate-950">{selected.title}</h2></div><button disabled={isProcessing} onClick={() => setSelected(null)} className="text-sm font-semibold text-slate-500">Đóng</button></div>
+      {(selected.created_by_detail?.role === "student" || (!!selected.created_by && selected.created_by !== selected.proposed_by)) && (
+        <div className="mt-3 rounded-xl border border-teal-200 bg-teal-50/70 p-3 text-xs text-teal-900">
+          <p className="font-bold text-[#006A60]">Đề tài do sinh viên tự đề xuất:</p>
+          <p className="mt-0.5">
+            Sinh viên: <strong>{selected.created_by_detail?.first_name} {selected.created_by_detail?.last_name}</strong> {selected.created_by_detail?.student_code ? `(MSSV: ${selected.created_by_detail.student_code})` : ""} · GVHD tiếp nhận: <strong>{selected.proposed_by_detail ? `${selected.proposed_by_detail.first_name} ${selected.proposed_by_detail.last_name}` : ""}</strong>
+          </p>
+          <p className="mt-1 text-[11px] text-teal-700">
+            * Sau khi Trưởng bộ môn phê duyệt, đề tài sẽ chính thức đưa vào danh mục và tự động giao cho sinh viên này thực hiện.
+          </p>
+        </div>
+      )}
       <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">{selected.description || "Chưa có mô tả."}</p>
       <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600"><span className="rounded bg-slate-100 px-2 py-1">{selected.department_name}</span><span className="rounded bg-slate-100 px-2 py-1">{selected.field_name || "Chưa phân loại"}</span><span className="rounded bg-slate-100 px-2 py-1">{selected.academic_year_name} · {selected.semester_name}</span></div>
       <Link to={`/topics/${selected.id}`} className="mt-3 inline-block text-sm font-semibold text-blue-700 hover:underline">Mở trang chi tiết đầy đủ →</Link>

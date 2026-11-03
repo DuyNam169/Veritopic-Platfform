@@ -49,7 +49,7 @@ export const MyTopicsPage: React.FC = () => {
       department: departmentFilter ? Number(departmentFilter) : undefined,
       field: fieldFilter ? Number(fieldFilter) : undefined,
       semester: semesterFilter ? Number(semesterFilter) : undefined,
-      status: statusFilter || undefined,
+      status: statusFilter || (activeTab === "bank" ? "approved" : undefined),
     };
 
     const apiCall = activeTab === "mine" ? teacherApi.getMyTopics(params) : teacherApi.getAllTopics(params);

@@ -76,7 +76,7 @@ export interface StudentTopicProposalItem {
   academic_year_name: string;
   semester: number;
   semester_name: string;
-  status: "pending" | "approved" | "rejected" | "revision_requested";
+  status: "pending" | "waiting_approval" | "approved" | "rejected" | "revision_requested";
   status_display: string;
   teacher_note: string;
   created_topic: number | null;
@@ -104,6 +104,18 @@ export interface TopicRegistrationItem {
   updated_at: string;
 }
 
+export interface AdvisorProfile {
+  id: number;
+  first_name: string;
+  last_name: string;
+  username?: string;
+  email: string;
+  academic_degree?: string;
+  specialization?: string;
+  phone_number?: string;
+  department_name?: string;
+}
+
 export interface MyTopicStatusResponse {
   has_topic: boolean;
   can_choose_topic: boolean;
@@ -112,6 +124,7 @@ export interface MyTopicStatusResponse {
     id: number;
     topic_id: number;
     topic_title: string;
+    proposed_by_detail?: AdvisorProfile | null;
     status: string;
     status_display: string;
     due_date?: string;

@@ -60,18 +60,86 @@ def propose_topic(topic: Topic, actor):
 
 @transaction.atomic
 def approve_topic(topic: Topic, actor, note: str = ""):
+    from apps.accounts.models import Notification
+    from apps.topics.models import StudentTopicProposal, TopicAssignment, TopicRegistration
+
     topic.status = Topic.Status.APPROVED
     topic.reviewed_by = actor
     topic.review_note = note
     topic.save(update_fields=["status", "reviewed_by", "review_note", "updated_at"])
     TopicHistory.objects.create(topic=topic, action=TopicHistory.Action.APPROVED, actor=actor, note=note)
+
+    # Nếu đề tài này bắt nguồn từ đề xuất của sinh viên
+    proposal = StudentTopicProposal.objects.filter(created_topic=topic).first()
+    if proposal:
+        proposal.status = StudentTopicProposal.Status.APPROVED
+        proposal.save(update_fields=["status", "updated_at"])
+
+        # Tạo lượt giao đề tài chính thức cho sinh viên đề xuất
+        assignment, _ = TopicAssignment.objects.get_or_create(
+            topic=topic,
+            defaults={
+                "assigned_by": topic.proposed_by,
+                "note": f"Đề tài do sinh viên đề xuất, GVHD hướng dẫn và Trưởng bộ môn phê duyệt. {note}".strip(),
+            },
+        )
+        assignment.students.add(proposal.student)
+
+        # Đồng bộ Giảng viên hướng dẫn
+        from apps.accounts.models import AdvisorRequest
+        teacher = topic.proposed_by or proposal.teacher
+        if teacher:
+            AdvisorRequest.objects.filter(
+                student=proposal.student,
+                status=AdvisorRequest.Status.PENDING,
+            ).update(status=AdvisorRequest.Status.CANCELLED)
+
+            adv_req, _ = AdvisorRequest.objects.get_or_create(
+                student=proposal.student,
+                teacher=teacher,
+                defaults={
+                    "status": AdvisorRequest.Status.ACCEPTED,
+                    "message": f"Đề xuất đề tài: {proposal.title}",
+                    "response_note": "Đề tài đề xuất đã được phê duyệt.",
+                },
+            )
+            if adv_req.status != AdvisorRequest.Status.ACCEPTED:
+                adv_req.status = AdvisorRequest.Status.ACCEPTED
+                adv_req.save(update_fields=["status", "updated_at"])
+
+        # Hủy các đăng ký đề tài khác đang chờ của sinh viên này
+        TopicRegistration.objects.filter(
+            student=proposal.student,
+            status=TopicRegistration.Status.PENDING,
+        ).update(status=TopicRegistration.Status.CANCELLED)
+
+        note_info = f" Ghi chú: {note}" if note else ""
+        Notification.objects.create(
+            recipient=proposal.student,
+            sender=actor,
+            title="Đề tài đồ án đã được Trưởng bộ môn phê duyệt",
+            message=f"Đề tài '{topic.title}' do bạn đề xuất đã được Trưởng bộ môn phê duyệt chính thức và phân công cho bạn thực hiện.{note_info}",
+            notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
+            link="/projects",
+        )
+
+        if topic.proposed_by and topic.proposed_by != actor:
+            Notification.objects.create(
+                recipient=topic.proposed_by,
+                sender=actor,
+                title="Đề tài đề xuất từ sinh viên đã được phê duyệt",
+                message=f"Đề tài '{topic.title}' (SV: {proposal.student.get_full_name() or proposal.student.username}) đã được Trưởng bộ môn phê duyệt.{note_info}",
+                notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
+                link="/teacher/student-requests?tab=proposals",
+            )
+
     return topic
 
 
 @transaction.atomic
 def reject_topic(topic: Topic, actor, note: str = ""):
     from apps.accounts.models import Notification
-    from apps.topics.models import TopicAssignment
+    from apps.topics.models import StudentTopicProposal, TopicAssignment
 
     topic.status = Topic.Status.REJECTED
     topic.reviewed_by = actor
@@ -79,8 +147,7 @@ def reject_topic(topic: Topic, actor, note: str = ""):
     topic.save(update_fields=["status", "reviewed_by", "review_note", "updated_at"])
     TopicHistory.objects.create(topic=topic, action=TopicHistory.Action.REJECTED, actor=actor, note=note)
 
-    # Nếu đề tài có assignment đang active (ví dụ sinh viên đề xuất đề tài được GV duyệt trước đó),
-    # khi Trưởng bộ môn từ chối đề tài thì hủy các assignment liên quan và gửi thông báo cho sinh viên.
+    # Nếu đề tài có assignment đang active, hủy các assignment liên quan
     active_assignments = topic.assignments.filter(status=TopicAssignment.Status.ACTIVE).prefetch_related("students")
     for assign in active_assignments:
         assign.status = TopicAssignment.Status.CANCELLED
@@ -96,16 +163,70 @@ def reject_topic(topic: Topic, actor, note: str = ""):
                 notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
                 link="/projects",
             )
+
+    # Cập nhật proposal nếu có
+    proposal = StudentTopicProposal.objects.filter(created_topic=topic).first()
+    if proposal:
+        proposal.status = StudentTopicProposal.Status.REJECTED
+        proposal.save(update_fields=["status", "updated_at"])
+
+        note_info = f" Lý do: {note}" if note else ""
+        Notification.objects.create(
+            recipient=proposal.student,
+            sender=actor,
+            title="Đề tài đề xuất bị Trưởng bộ môn từ chối",
+            message=f"Đề tài '{topic.title}' do bạn đề xuất đã bị Trưởng bộ môn từ chối duyệt.{note_info}",
+            notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
+            link="/student/propose",
+        )
+        if topic.proposed_by and topic.proposed_by != actor:
+            Notification.objects.create(
+                recipient=topic.proposed_by,
+                sender=actor,
+                title="Đề tài đề xuất từ sinh viên bị từ chối",
+                message=f"Đề tài '{topic.title}' (SV: {proposal.student.get_full_name() or proposal.student.username}) đã bị Trưởng bộ môn từ chối duyệt.{note_info}",
+                notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
+                link="/teacher/student-requests?tab=proposals",
+            )
+
     return topic
 
 
 @transaction.atomic
 def request_rename(topic: Topic, actor, note: str = ""):
+    from apps.accounts.models import Notification
+    from apps.topics.models import StudentTopicProposal
+
     topic.status = Topic.Status.RENAME_REQUESTED
     topic.reviewed_by = actor
     topic.review_note = note
     topic.save(update_fields=["status", "reviewed_by", "review_note", "updated_at"])
     TopicHistory.objects.create(topic=topic, action=TopicHistory.Action.RENAME_REQUESTED, actor=actor, note=note)
+
+    proposal = StudentTopicProposal.objects.filter(created_topic=topic).first()
+    if proposal:
+        proposal.status = StudentTopicProposal.Status.REVISION_REQUESTED
+        proposal.save(update_fields=["status", "updated_at"])
+
+        note_info = f" Ghi chú: {note}" if note else ""
+        Notification.objects.create(
+            recipient=proposal.student,
+            sender=actor,
+            title="Yêu cầu sửa tên đề tài đề xuất",
+            message=f"Đề tài '{topic.title}' do bạn đề xuất được Trưởng bộ môn yêu cầu điều chỉnh tên.{note_info}",
+            notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
+            link="/student/propose",
+        )
+        if topic.proposed_by and topic.proposed_by != actor:
+            Notification.objects.create(
+                recipient=topic.proposed_by,
+                sender=actor,
+                title="Yêu cầu sửa tên đề tài đề xuất từ sinh viên",
+                message=f"Đề tài '{topic.title}' (SV: {proposal.student.get_full_name() or proposal.student.username}) được Trưởng bộ môn yêu cầu điều chỉnh tên.{note_info}",
+                notification_type=Notification.NotificationType.TOPIC_PROPOSAL_RESPONSE,
+                link="/teacher/student-requests?tab=proposals",
+            )
+
     return topic
 
 
@@ -142,6 +263,29 @@ def assign_topic(topic: Topic, student_ids: list[int], actor, note: str = "", du
         actor=actor,
         note=history_note,
     )
+
+    # Đồng bộ Giảng viên hướng dẫn cho các sinh viên được phân công
+    teacher = topic.proposed_by or actor
+    if teacher and getattr(teacher, "role", "") in ("teacher", "department_head"):
+        from apps.accounts.models import AdvisorRequest
+        for student in students:
+            AdvisorRequest.objects.filter(
+                student=student,
+                status=AdvisorRequest.Status.PENDING,
+            ).update(status=AdvisorRequest.Status.CANCELLED)
+
+            adv_req, _ = AdvisorRequest.objects.get_or_create(
+                student=student,
+                teacher=teacher,
+                defaults={
+                    "status": AdvisorRequest.Status.ACCEPTED,
+                    "message": f"Phân công đề tài: {topic.title}",
+                    "response_note": f"Giảng viên giao đề tài. {note or ''}".strip(),
+                },
+            )
+            if adv_req.status != AdvisorRequest.Status.ACCEPTED:
+                adv_req.status = AdvisorRequest.Status.ACCEPTED
+                adv_req.save(update_fields=["status", "updated_at"])
 
     # Tự động gửi thông báo cho từng sinh viên được phân công
     actor_name = actor.get_full_name() or actor.username

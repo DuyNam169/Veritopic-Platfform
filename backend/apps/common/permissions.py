@@ -44,6 +44,33 @@ class IsAdminOrDepartmentHead(BasePermission):
         )
 
 
+class IsAdminOrTeacher(BasePermission):
+    """Cho phép Quản trị viên, Trưởng bộ môn hoặc Giảng viên."""
+    message = "Chỉ Giảng viên, Trưởng bộ môn hoặc Quản trị viên mới có quyền thực hiện thao tác này."
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("admin", "department_head", "teacher")
+        )
+
+
+class ReadOnlyForStaffOrAdmin(BasePermission):
+    """
+    Cho phép Admin, Trưởng bộ môn và Giảng viên xem (GET/HEAD/OPTIONS).
+    Chỉ Admin mới có quyền thêm/sửa/xóa (POST/PUT/PATCH/DELETE).
+    """
+    SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.method in self.SAFE_METHODS:
+            return request.user.role in ("admin", "department_head", "teacher")
+        return request.user.role == "admin"
+
+
 class ReadOnlyOrAdmin(BasePermission):
     """Cho phép mọi user đã đăng nhập đọc (GET), chỉ Admin mới được ghi (POST/PUT/PATCH/DELETE)."""
 

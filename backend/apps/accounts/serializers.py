@@ -1,3 +1,4 @@
+from apps.accounts import test_student_class
 from django.contrib.auth import get_user_model
 from .models import Notification, AdvisorRequest
 from rest_framework import serializers
@@ -55,6 +56,9 @@ class AcademicProfileValidationMixin:
 
 
 class UserSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source="department.name", read_only=True, allow_null=True)
+    cohort_name = serializers.CharField(source="cohort.name", read_only=True, allow_null=True)
+
     def validate(self, attrs):
         validate_student_class(attrs, self.instance)
         return attrs
@@ -71,13 +75,22 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id", "username", "email", "first_name", "last_name",
-            "role", "avatar", "phone_number", "department", "cohort", "student_code",
-            "class_name", "student_class", "created_at", "last_login",
-            "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status",
+            "role", "avatar", "phone_number",
+            "department", "department_name", "cohort", "cohort_name",
+            "student_code", "class_name", "student_class",
+            "created_at", "last_login",
+            "major", "academic_year", "lecturer_code", "academic_degree",
+            "specialization", "date_of_birth", "gender", "student_status",
         )
         # This serializer is also used by /auth/me/.  Never let a user change
         # their own role (or any other account's password) through that route.
-        read_only_fields = ("class_name", "id", "role", "department", "cohort", "student_code", "created_at", "last_login", "username", "major", "academic_year", "lecturer_code", "academic_degree", "specialization", "date_of_birth", "gender", "student_status")
+        read_only_fields = (
+            "id", "role", "username", "created_at", "last_login",
+            "department", "department_name", "cohort", "cohort_name",
+            "student_code", "class_name",
+            "major", "academic_year", "lecturer_code", "academic_degree",
+            "specialization", "date_of_birth", "gender", "student_status",
+        )
 
     def validate_email(self, value):
         existing = User.objects.filter(email__iexact=value).exclude(pk=self.instance.pk if self.instance else None)
@@ -113,7 +126,7 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError({"new_password": "Mật khẩu mới không được trùng với mật khẩu hiện tại."})
         return attrs
 
-    def save(self):
+    def save(self, **kwargs):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
         user.save(update_fields=["password"])

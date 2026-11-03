@@ -73,7 +73,7 @@ class AdvisorRequestViewSet(viewsets.ModelViewSet):
                 title="Yêu cầu hướng dẫn đồ án mới",
                 message=f"Sinh viên {user.get_full_name() or user.username} ({user.student_code or 'N/A'}) - Khóa {user.cohort.name if user.cohort else 'N/A'} đã gửi yêu cầu chọn bạn làm Giảng viên hướng dẫn.",
                 notification_type=Notification.NotificationType.ADVISOR_REQUEST,
-                link="/teacher/student-requests",
+                link="/teacher/student-requests?tab=advisors",
             )
             self._created_instance = advisor_req
 
@@ -141,17 +141,69 @@ class AdvisorRequestViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="my-advisor")
     def my_advisor(self, request):
         """Lấy thông tin GVHD hiện tại của sinh viên."""
+        # 1. Kiểm tra qua AdvisorRequest (đã được chấp nhận)
         req = AdvisorRequest.objects.filter(
             student=request.user,
             status=AdvisorRequest.Status.ACCEPTED,
         ).select_related("teacher", "teacher__department").first()
-        if not req:
-            return Response({"has_advisor": False, "advisor": None, "request": None})
-        return Response({
-            "has_advisor": True,
-            "advisor": UserSerializer(req.teacher).data,
-            "request": AdvisorRequestSerializer(req).data,
-        })
+        if req:
+            return Response({
+                "has_advisor": True,
+                "advisor": UserSerializer(req.teacher).data,
+                "request": AdvisorRequestSerializer(req).data,
+            })
+
+        # 2. Kiểm tra nếu sinh viên đã có đề tài chính thức đang thực hiện (TopicAssignment active)
+        from apps.topics.models import TopicAssignment
+        active_assignment = TopicAssignment.objects.filter(
+            students=request.user,
+            status=TopicAssignment.Status.ACTIVE,
+        ).select_related(
+            "topic", "topic__proposed_by", "topic__proposed_by__department", "assigned_by", "assigned_by__department"
+        ).first()
+
+        if active_assignment:
+            teacher = active_assignment.topic.proposed_by or active_assignment.assigned_by
+            if teacher:
+                # Đồng bộ hoặc tạo mới AdvisorRequest accepted
+                advisor_req, _ = AdvisorRequest.objects.get_or_create(
+                    student=request.user,
+                    teacher=teacher,
+                    defaults={
+                        "status": AdvisorRequest.Status.ACCEPTED,
+                        "message": f"Hướng dẫn qua đề tài đồ án: {active_assignment.topic.title}",
+                        "response_note": "Chấp thuận qua phân công đề tài",
+                    },
+                )
+                if advisor_req.status != AdvisorRequest.Status.ACCEPTED:
+                    advisor_req.status = AdvisorRequest.Status.ACCEPTED
+                    advisor_req.save(update_fields=["status", "updated_at"])
+
+                # Hủy các yêu cầu chọn GVHD khác đang pending nếu có
+                AdvisorRequest.objects.filter(
+                    student=request.user,
+                    status=AdvisorRequest.Status.PENDING,
+                ).exclude(pk=advisor_req.pk).update(status=AdvisorRequest.Status.CANCELLED)
+
+                return Response({
+                    "has_advisor": True,
+                    "advisor": UserSerializer(teacher).data,
+                    "request": AdvisorRequestSerializer(advisor_req).data,
+                })
+
+        # 3. Nếu chưa có GVHD chính thức, kiểm tra xem có yêu cầu đang chờ duyệt (pending) không
+        pending_req = AdvisorRequest.objects.filter(
+            student=request.user,
+            status=AdvisorRequest.Status.PENDING,
+        ).select_related("teacher", "teacher__department").first()
+        if pending_req:
+            return Response({
+                "has_advisor": False,
+                "advisor": None,
+                "request": AdvisorRequestSerializer(pending_req).data,
+            })
+
+        return Response({"has_advisor": False, "advisor": None, "request": None})
 
     @action(detail=False, methods=["get"], url_path="my-advisees")
     def my_advisees(self, request):
@@ -197,7 +249,7 @@ class AdvisorRequestViewSet(viewsets.ModelViewSet):
         search = request.query_params.get("search", "")
 
         teachers = User.objects.filter(
-            role="teacher", is_active=True
+            role__in=("teacher", "department_head"), is_active=True
         ).select_related("department")
 
         if dept_id:

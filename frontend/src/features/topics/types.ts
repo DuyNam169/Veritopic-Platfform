@@ -14,6 +14,8 @@ export interface Topic {
   semester: number;
   proposed_by: number;
   proposed_by_detail?: User;
+  created_by?: number;
+  created_by_detail?: User;
   department_name: string;
   field_name: string | null;
   cohort_name: string;

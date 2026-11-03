@@ -15,6 +15,7 @@ class StatisticsOverviewTests(APITestCase):
         User = get_user_model()
         self.admin = User.objects.create_user(username="stats_admin", role="admin")
         self.head = User.objects.create_user(username="stats_head", role="department_head")
+        self.student = User.objects.create_user(username="stats_student", role="student")
         self.teacher_one = User.objects.create_user(
             username="teacher_one", first_name="An", last_name="Nguyễn", role="teacher"
         )
@@ -83,11 +84,17 @@ class StatisticsOverviewTests(APITestCase):
         self.assertEqual(empty.data["total"], 0)
         self.assertEqual(empty.data["by_status"], [])
 
-    def test_statistics_are_admin_only(self):
-        for user in (self.head, self.teacher_one):
+    def test_statistics_allowed_for_admin_head_and_teacher(self):
+        for user in (self.admin, self.head, self.teacher_one):
             with self.subTest(role=user.role):
                 self.client.force_authenticate(user)
-                self.assertEqual(self.client.get(self.url).status_code, status.HTTP_403_FORBIDDEN)
+                self.assertEqual(self.client.get(self.url).status_code, status.HTTP_200_OK)
+
+    def test_statistics_forbidden_for_student_and_unauthenticated(self):
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_403_FORBIDDEN)
+        self.client.logout()
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_authenticated_excel_export_honors_filters(self):
         self.client.force_authenticate(self.admin)
@@ -125,7 +132,7 @@ class StatisticsOverviewTests(APITestCase):
         self.assertEqual(sheet["B4"].value, "Tên đề tài")
         self.assertIn("Không có đề tài", sheet["A5"].value)
 
-    def test_pdf_export_is_valid_and_admin_only(self):
+    def test_pdf_export_is_valid_and_permissions(self):
         url = reverse("statistics-export")
         self.client.force_authenticate(self.admin)
         response = self.client.get(url, {"export_format": "pdf", "status": Topic.Status.PENDING})
@@ -138,8 +145,56 @@ class StatisticsOverviewTests(APITestCase):
         self.assertEqual(empty_response.status_code, status.HTTP_200_OK)
         self.assertTrue(empty_response.content.startswith(b"%PDF"))
 
-        self.client.force_authenticate(self.head)
+        # Teacher and department head can also export
+        for user in (self.head, self.teacher_one):
+            with self.subTest(role=user.role):
+                self.client.force_authenticate(user)
+                self.assertEqual(
+                    self.client.get(url, {"export_format": "excel"}).status_code,
+                    status.HTTP_200_OK,
+                )
+                self.assertEqual(
+                    self.client.get(url, {"export_format": "pdf"}).status_code,
+                    status.HTTP_200_OK,
+                )
+
+        # Student cannot export
+        self.client.force_authenticate(self.student)
         self.assertEqual(
             self.client.get(url, {"export_format": "excel"}).status_code,
             status.HTTP_403_FORBIDDEN,
         )
+
+    def test_teacher_statistics_scoped_to_own_topics(self):
+        # Teacher one proposed 2 topics (Đề tài 1, Đề tài 3)
+        self.client.force_authenticate(self.teacher_one)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["total"], 2)
+        self.assertEqual(len(response.data["by_teacher"]), 1)
+        self.assertEqual(response.data["by_teacher"][0]["proposed_by__username"], "teacher_one")
+
+        # Teacher one attempts to pass proposed_by=teacher_two, which must be ignored
+        scoped_response = self.client.get(self.url, {"proposed_by": self.teacher_two.pk})
+        self.assertEqual(scoped_response.data["total"], 2)
+        self.assertEqual(scoped_response.data["by_teacher"][0]["proposed_by__username"], "teacher_one")
+
+        # Teacher two proposed 1 topic (Đề tài 2)
+        self.client.force_authenticate(self.teacher_two)
+        response2 = self.client.get(self.url)
+        self.assertEqual(response2.data["total"], 1)
+        self.assertEqual(len(response2.data["by_teacher"]), 1)
+        self.assertEqual(response2.data["by_teacher"][0]["proposed_by__username"], "teacher_two")
+
+    def test_teacher_export_contains_only_own_topics(self):
+        self.client.force_authenticate(self.teacher_one)
+        url = reverse("statistics-export")
+        response = self.client.get(url, {"export_format": "excel"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        workbook = load_workbook(io.BytesIO(response.content))
+        sheet = workbook.active
+        titles = [sheet.cell(row=r, column=2).value for r in range(5, sheet.max_row + 1)]
+        self.assertIn("Đề tài 1", titles)
+        self.assertIn("Đề tài 3", titles)
+        self.assertNotIn("Đề tài 2", titles)

@@ -57,7 +57,10 @@ export const router = createBrowserRouter([
           { path: "/topics/:id", element: <TopicDetailPage /> },
           {
             element: <RoleGuard allow={["admin", "department_head", "teacher"]} />,
-            children: [{ path: "/topics/similarity", element: <SimilarityCheckPage /> }],
+            children: [
+              { path: "/topics/similarity", element: <SimilarityCheckPage /> },
+              { path: "/statistics", element: <StatisticsPage /> },
+            ],
           },
           { path: "/profile", element: <ProfilePage /> },
           { path: "/notifications", element: <NotificationsPage /> },
@@ -69,6 +72,7 @@ export const router = createBrowserRouter([
             children: [
               { path: "/student/advisor", element: <StudentAdvisorPage /> },
               { path: "/student/propose", element: <StudentProposeTopicPage /> },
+              { path: "/student/proposals", element: <StudentProposeTopicPage /> },
             ],
           },
           {
@@ -83,7 +87,6 @@ export const router = createBrowserRouter([
             children: [
               { path: "/academics", element: <AcademicsPage /> },
               { path: "/technologies", element: <TechnologiesPage /> },
-              { path: "/statistics", element: <StatisticsPage /> },
             ],
           },
           {

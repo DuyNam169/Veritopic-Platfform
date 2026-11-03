@@ -368,7 +368,11 @@ export const StudentProposeTopicPage: React.FC = () => {
                       </h3>
                       {prop.status === "approved" ? (
                         <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle className="w-3 h-3" /> GV đã duyệt
+                          <CheckCircle className="w-3 h-3" /> Đã duyệt chính thức
+                        </span>
+                      ) : prop.status === "waiting_approval" ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                          <Clock className="w-3 h-3" /> Chờ TBM duyệt
                         </span>
                       ) : prop.status === "revision_requested" ? (
                         <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
